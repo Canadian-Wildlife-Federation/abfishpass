@@ -62,6 +62,10 @@ def prepareOutput(conn):
       primary key (id)
     );
     
+    --ensure results are readable
+    GRANT USAGE ON SCHEMA {dbTargetSchema} TO public;
+    GRANT SELECT ON {dbTargetSchema}.{dbTargetTable} to public;
+    
     DELETE FROM {dbTargetSchema}.{dbTargetTable} WHERE watershed_id = '{watershed_id}';
 
     --this function exists on newer 3.x+ version of PostGIS and can be
