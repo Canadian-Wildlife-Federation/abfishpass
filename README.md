@@ -78,12 +78,12 @@ assign_raw_z.py
 * Directory of tif images representing DEM files. All files should have the same projection and resolution.
 * A streams table with id (uuid), watershed_id (varchar), and geometry (linestring) fields.
 
-** Output**
+**Output**
 
 * A new table with id, watershed_id, and geometry_raw3d fields.
 **ALL EXISTING DATA IN THE OUTPUT TABLE WILL BE DELETED**
 
-** Relevant Configuration Settings**
+**Relevant Configuration Settings**
 
 All the inputs/outputs are specified in the config.ini file. In particular:
 
@@ -106,7 +106,7 @@ smooth_z.py
 **Output**
 * a new field, geometry_smoothed3d, added to the input table
 
-** Relevant Configuration Settings**
+**Relevant Configuration Settings**
 
 * [PROCESSING]:output_schema -> the schema to write results to
 * [ELEVATION_PROCESSING]:target_table -> the table to write results to
@@ -122,31 +122,31 @@ To compute raw elevation, for each vertex:
 
 2. compute a bilinear interpolated value at this point using the values from cells A, B, C, & D.
 
-	 A = (x1, y2, Az)
-	 B = (x2, y2, Bz)
-	 C = (x1, y1, Cz)
-	 D = (x2, y1, Dz)
-    V = (x, y, Vz)
+<pre>
+A = (x1, y2, Az)
+B = (x2, y2, Bz)
+C = (x1, y1, Cz)
+D = (x2, y1, Dz)
+V = (x, y, Vz)
     
-	 fxy1 = ((x2 - x) / (x2- x1))*Cz + ((x - x1)/(x2 - x1))*Dz
-	 fxy2 = ((x2 - x) / (x2- x1))*Az + ((x - x1)/(x2 - x1))*Bz
-	 Vz = ((y2 - y) / (y2 - y1))*fxy1 + ((y - y1)/(y2 - y1))*fxy2
+fxy1 = ((x2 - x) / (x2- x1))*Cz + ((x - x1)/(x2 - x1))*Dz
+fxy2 = ((x2 - x) / (x2- x1))*Az + ((x - x1)/(x2 - x1))*Bz
+Vz = ((y2 - y) / (y2 - y1))*fxy1 + ((y - y1)/(y2 - y1))*fxy2
 
-
-    +-------------+-------------+
-    |             |             |
-    |             |             |
-    |      A      |      B      |
-    |             |             |
-    |             |             |
-    +-------------+-------------+
-    |          V  |             |
-    |             |             |
-    |      C      |      D      |
-    |             |             |
-    |             |             |
-    +-------------+-------------+
-    
++-------------+-------------+
+|             |             |
+|             |             |
+|      A      |      B      |
+|             |             |
+|             |             |
++-------------+-------------+
+|          V  |             |
+|             |             |
+|      C      |      D      |
+|             |             |
+|             |             |
++-------------+-------------+
+</pre>    
 
 Notes: we assume that the elevation values provided in the DEM represent the elevation at the center point of the cell    
 
@@ -167,14 +167,15 @@ Notes:
 5. For each edge in the network
   * clip all vertcies elevations so they are no smaller or bigger than the z values at the end nodes
   * compute min/max elevations for each vertex then average the results to get smoothed value 
-  
-     Node  Elevation   Min  Max   Smoothed
-      A       12       12   12    12
-      B       10       10   10    10
-      C       6        6    7     6.5
-      D       7        6    7     6.5      
-      F       8        8    8     8      
-      G       2        2    2     2
+
+<pre>
+ Node  Elevation   Min  Max   Smoothed
+  A       12       12   12    12
+  B       10       10   10    10
+  C       6        6    7     6.5
+  D       7        6    7     6.5      
+  F       8        8    8     8      
+  G       2        2    2     2
   
     A           B 
      \         /
@@ -190,4 +191,4 @@ Notes:
         |
         F
         
-        
+</pre>        
