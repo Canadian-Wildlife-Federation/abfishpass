@@ -5,6 +5,15 @@ Store scripts related to habitat modelling in Alberta / CWF
 
 This project contains a set of scripts to load source Alberta data into a PostgreSQL database and compute elevation values for the stream network.
 
+# Copyright
+
+Copyright 2022 by Canadian Wildlife Federation, Alberta Environment and Parks
+
+# License
+
+Apache License, Version 2.0
+http://www.apache.org/licenses/LICENSE-2.0
+
 ## Software Requirements
 * Python (tested with version 3.9.5)
     * Modules: shapely, psycopg2, tifffile
