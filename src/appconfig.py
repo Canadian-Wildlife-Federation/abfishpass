@@ -19,6 +19,7 @@
 import configparser
 import os
 import psycopg2 as pg2
+import psycopg2.extras
 import sys
 
 NODATA = -999999
@@ -48,12 +49,16 @@ streamTable = config['DATABASE']['stream_table'];
 
 dataSrid = config['DATABASE']['working_srid']  
 
-print(f"""--- Configuration Settings ---
+dbIdField = "id"
+dbGeomField = "geometry"
+dbWatershedIdField = "watershed_id"
+
+print(f"""--- Configuration Settings Begin ---
 Database: {dbHost}:{dbPort}:{dbName}:{dbUser}
 ORG: {ogr}
 SRID: {dataSrid}
 Raw Data Schema: {dataSchema}
---- End ---
+--- Configuration Settings End ---
 """)   
 
 #if you have multiple version of proj installed
@@ -62,6 +67,7 @@ Raw Data Schema: {dataSchema}
 if (proj != ""):
     os.environ["PROJ_LIB"] = proj
 
+psycopg2.extras.register_uuid()
 
 def connectdb():
     return pg2.connect(database=dbName,

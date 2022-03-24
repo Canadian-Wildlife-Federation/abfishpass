@@ -23,8 +23,6 @@ import subprocess
 import appconfig
 import os
 
-if (appconfig.proj != ""):
-    os.environ["PROJ_LIB"] = appconfig.proj
 
 streamTable = appconfig.config['DATABASE']['stream_table'];
 roadTable = appconfig.config['CREATE_LOAD_SCRIPT']['road_table'];

@@ -27,9 +27,9 @@ from collections import deque
 
 dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
 
-dbTargetTable = appconfig.config['ELEVATION_PROCESSING']['target_table']
-dbSourceGeom = appconfig.config['ELEVATION_PROCESSING']['target_3dgeometry_field']
-dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['target_smoothedgeometry_field']
+dbTargetTable = appconfig.config['PROCESSING']['stream_table']
+dbSourceGeom = appconfig.config['ELEVATION_PROCESSING']['3dgeometry_field']
+dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['smoothedgeometry_field']
     
 edges = []
 nodes = dict()
@@ -71,7 +71,7 @@ class Edge:
         
 def createNetwork(connection):
     query = f"""
-        SELECT id, {dbSourceGeom}
+        SELECT {appconfig.dbIdField}, {dbSourceGeom}
         FROM {dbTargetSchema}.{dbTargetTable}
     """
    
@@ -146,10 +146,10 @@ def processNodes():
         edge.visited = False
         
     for node in nodes.values():
+        node.minvalue = node.z
         if (len(node.inedges) == 0):
-            node.minvalue = node.z
             toprocess.append(node)
-            
+     
     while (toprocess):
         node = toprocess.popleft()
         
@@ -163,22 +163,25 @@ def processNodes():
         else:
             #visit this node
             for outedge in node.outedges:
-                if (node.minvalue == appconfig.NODATA and outedge.toNode.z == appconfig.NODATA):
-                    #no data
-                    outedge.toNode.minvalue = outedge.toNode.z
-                elif (node.minvalue == appconfig.NODATA):
-                    outedge.toNode.minvalue = outedge.toNode.z
-                elif (outedge.toNode.z == appconfig.NODATA):
+                if (node.minvalue == appconfig.NODATA):
+                    outedge.toNode.minvalue = outedge.toNode.minvalue 
+                elif (outedge.toNode.minvalue == appconfig.NODATA):
                     outedge.toNode.minvalue = node.minvalue
-                else:        
-                    outedge.toNode.minvalue = min(node.minvalue, outedge.toNode.z)
+                else: 
+                    outedge.toNode.minvalue = min(node.minvalue, outedge.toNode.minvalue)
+                                   
+                outedge.visited = True
                 
-                outedge.visited = True  
+                if (outedge.toNode in toprocess):
+                    toprocess.remove(outedge.toNode)
                 toprocess.append(outedge.toNode)     
     
     #update z values 
     for node in nodes.values():
-        node.z = (node.maxvalue + node.minvalue) / 2.0
+        if (node.maxvalue == appconfig.NODATA or node.minvalue == appconfig.NODATA):
+            node.z = appconfig.NODATA
+        else:
+            node.z = (node.maxvalue + node.minvalue) / 2.0
         
     for edge in edges:
         edge.newz[0] = edge.fromNode.z
@@ -216,7 +219,10 @@ def processEdges():
             maxvalues [size - 1 - i ] = maxv
         
         for i in range(0, size):
-            edge.newz[i] = ((minvalues[i] + maxvalues[i]) / 2.0)
+            if minvalues[i] == appconfig.NODATA or maxvalues[i] == appconfig.NODATA:
+                edge.newz[i] = appconfig.NODATA
+            else:
+                edge.newz[i] = ((minvalues[i] + maxvalues[i]) / 2.0)
         
         
 def writeResults(connection):
@@ -224,7 +230,7 @@ def writeResults(connection):
     updatequery = f"""
         UPDATE {dbTargetSchema}.{dbTargetTable} 
         set {dbTargetGeom} = st_setsrid(st_geomfromwkb(%s),{appconfig.dataSrid})
-        WHERE id = %s
+        WHERE  {appconfig.dbIdField} = %s
     """
     
     newdata = []

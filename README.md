@@ -47,33 +47,126 @@ All of the scripts allow for a custom configuration file to be specified by prov
 * [DATABASE]:data_schema -> the main data schema to store raw source data
 * [DATABASE]:stream_table -> the name of the raw streams source data
 * [DATABASE]:working_srid -> the srid of the source data
+* [CABD_DATABASE]:host -> CABD database hostname for loading barriers
+* [CABD_DATABASE]:port -> CABD database port for loading barriers
+* [CABD_DATABASE]:name -> CABD database name for loading barriers
+* [CABD_DATABASE]:user -> CABD database username for loading barriers
+* [CABD_DATABASE]:password -> CABD database password for loading barriers
 * [CREATE_LOAD_SCRIPT]:raw_data -> link to the source data file
 * [CREATE_LOAD_SCRIPT]:road_table -> the database table name to load roads data into
 * [CREATE_LOAD_SCRIPT]:rail_table -> the database table name to load rail data into
 * [CREATE_LOAD_SCRIPT]:trail_table -> the database table name to load trails data into
 * [PROCESSING]:watershed_id -> the watershed id to process
 * [PROCESSING]:output_schema -> the database schema to write processing results to
+* [PROCESSING]:stream_table -> the main stream tables containing all the streams data for the watershed and computed outputs
 * [ELEVATION_PROCESSING]:dem_directory -> location of dem files
-* [ELEVATION_PROCESSING]:target_table -> output table for elevation processing
 * [ELEVATION_PROCESSING]:target_3dgeometry_field -> field name to write raw z geometries to
 * [ELEVATION_PROCESSING]:target_smoothedgeometry_field -> field name to write smoothed z geometries to
-
+* [MAINSTEM_PROCESSING]:mainstem_id -> mainstem id field name
+* [ELEVATION_PROCESSING]:downstream_route_measure  -> field name to downstream route measure to
+* [ELEVATION_PROCESSING]:upstream_route_measure  -> field name to write upstream route measure to
+* [GRADIENT_PROCESSING]: vertex_gradient_table -> table to store vertex graident data
+* [GRADIENT_PROCESSING]: segment_gradient_field -> field name to write segment graident value to    
+* [BARRIER_PROCESSING]: barrier_table -> name of table to load barrier data into
 
 ## 1 - Loading Data
 
 The first step is to populate the database with the required data. These load scripts are specific to the data provided for Alberta. Different source data will require modifications to these scripts.
 
 **Scripts**
-* create_db.py -> this script creates all the necessary database tables
-* load_alberta.py -> this script uses OGR to load the provided alberta data from the gdb file into the PostgreSQL database.
+* load_alberta/create_db.py -> this script creates all the necessary database tables
+* load_alberta/load_alberta.py -> this script uses OGR to load the provided alberta data from the gdb file into the PostgreSQL database.
 
 
 
-## 2 - Elevation Processing
+## 2 - Watershed Processing
 
-The elevation processing is flexible and should work on any datasets (Alberta or other), providing the requirements listed below are met.
+Processing is completed by watershed id. When processing a watershed all processed data is written to a schema in the database named after the watershed identifier.
 
-### 2A - Assign Raw Z Value
+Currently processing includes:
+* Preprocessing step which loads all the streams from the raw datastore into the working schema
+* Loading barriers from the CABD barrier database
+* Snapping barriers to stream network and breaking the stream segements at these points
+* Computing an elevation values for all stream segements
+* Computing a smoothed elevation value for all stream segements
+* Computing mainstems based on stream name and upstream length for stream segements
+* Computing graident for each stream segements based on the start and end elevation points AND compute gradient for each stream vertex based on vertex elevation and elevation 100m upstream.
+
+
+**Script**
+
+process_watershed.py
+
+**Input Requirements**
+
+* Directory of tif images representing DEM files. All files should have the same projection and resolution.
+* A raw streams table with id (uuid), watershed_id (varchar), and geometry (linestring) fields. The scripts assume this data is in an equal length projection so the st_length(geometry) function returns the length in metres. 
+
+**Output**
+
+* A new schema with a streams table, barriers tabels.
+**ALL EXISTING DATA IN THE OUTPUT TABLES WILL BE DELETED**
+ 
+
+### 2 - Watershed Processing Step Scripts
+
+#### 2A - PreProcessing
+
+This script creates required database schemas, and loads stream data for the watershed into a working table in this schema.
+
+**Script**
+
+preprocess_watershed.py
+
+**Input Requirements**
+
+* Raw stream network dataset loaded
+
+
+**Output**
+
+* A database schema named after the watershed id
+* A streams table in this schema populated with all streams from the raw dataset
+
+
+#### 2B - Loading Barriers
+This script loads waterfalls and dam barriers from the CABD database.
+
+
+**Script**
+
+load_barriers_cabd.py
+
+**Input Requirements**
+
+* Access to the CABD database
+* Streams table populated from the preprocessing step 
+
+**Output**
+
+* A new barrier table populated with dam and waterfall barriers from the CABD database
+
+
+#### 2C - Snapping Barriers and Breaking Streams
+This step snaps barriers to the nearset stream network (within 150m), and then breaks the
+stream segments into multiple segments at these points.
+
+**Script**
+
+snap_and_break_barriers.py
+
+**Input Requirements**
+
+* Stream table populated from the preprocessing step
+* Barriers table  
+
+**Output**
+
+* A snapped_geometry column is added to the barriers table
+* Streams table is updated with stream segments broken at snapped barrier points
+
+
+#### 2D - Assign Raw Z Value
 This step drapes a stream network over provided DEMs and computes a rawz value for each vertex in the stream network.
 
 Only a single watershed is processed at a time. 
@@ -85,24 +178,13 @@ assign_raw_z.py
 **Input Requirements**
 
 * Directory of tif images representing DEM files. All files should have the same projection and resolution.
-* A streams table with id (uuid), watershed_id (varchar), and geometry (linestring) fields.
+* Streams table populated from the preprocessing step
 
 **Output**
 
-* A new table with id, watershed_id, and geometry_raw3d fields.
-**ALL EXISTING DATA IN THE OUTPUT TABLE WILL BE DELETED**
+* A geometry_raw3d field added to the stream table that represents the 3d geometry for the segment
 
-**Relevant Configuration Settings**
-
-All the inputs/outputs are specified in the config.ini file. In particular:
-
-* [PROCESSING]:watershedid -> the watershed to process
-* [PROCESSING]:output_schema -> the schema to write results to
-* [ELEVATION_PROCESSING]:dem_directory -> location of dem files
-* [ELEVATION_PROCESSING]:target_table -> the table to write results to
-* [ELEVATION_PROCESSING]:target_3dgeometry_field -> the name of the geometry field to write to
-
-### 2B - Compute Smoothed Z Value
+#### 2E - Compute Smoothed Z Value
 
 This step takes a set of stream edges with raw z values and smoothes them so that the streams are always flowing down hill.
 
@@ -110,20 +192,39 @@ This step takes a set of stream edges with raw z values and smoothes them so tha
 smooth_z.py
 
 **Input Requirements**
-* table with id and geometry_raws3d fields (output from the raw z processing)
+* Streams table with id and geometry_raws3d fields (output from the raw z processing)
 
 **Output**
-* a new field, geometry_smoothed3d, added to the input table
+* A new field, geometry_smoothed3d, added to the input table
 
-**Relevant Configuration Settings**
+#### 2F - Compute Mainstems
 
-* [PROCESSING]:output_schema -> the schema to write results to
-* [ELEVATION_PROCESSING]:target_table -> the table to write results to
-* [ELEVATION_PROCESSING]:target_3dgeometry_field -> the name of the geometry with raw z values
-* [ELEVATION_PROCESSING]:target_smoothedgeometry_field -> the name of the geometry field to write smoothed results to
+This step computes mainstems based on name and upstream length for the watershed streams.
 
+**Script**
+compute_mainstems.py
 
-## Draping Algorithm
+**Input Requirements**
+* Streams table
+
+**Output**
+* A new field, mainstem_id, downstream_route_measure and upstream_route_measure, added to the input table
+
+#### 2G - Compute Graident
+
+This step computes two gradients - one for each stream segement based on the smoothed z values at the start and end of the segments. The other is a gradient for each vertex point based on the smoothed value at that point and the values 100m upstream.
+
+**Script**
+compute_graident.py
+
+**Input Requirements**
+* Streams table with smoothed geometry value
+
+**Output**
+* A new table, vertex_graident, that contains the vertex point, upstream point, the elevation at these two points, and gradient computed based on these elevation values and a graident class.
+
+## Algorithms 
+### Draping Algorithm
 
 To compute raw elevation, for each vertex:
 
@@ -159,7 +260,7 @@ Vz = ((y2 - y) / (y2 - y1))*fxy1 + ((y - y1)/(y2 - y1))*fxy2
 
 Notes: we assume that the elevation values provided in the DEM represent the elevation at the center point of the cell    
 
-## Smoothing Algorithm
+### Smoothing Algorithm
 
 The smoothing process ensures streams always flow down hill.
 
@@ -201,3 +302,13 @@ Notes:
         F
         
 </pre>        
+
+
+
+### Mainstem Algorithm
+
+Mainstems are computed by starting at the sink node and walking up the network. At any confluence the mainsteam is push up the edge that:
+1) has the same stream name as the current edge
+2) if no edges have the same name then any named edge; if there are multiple named edges it picks the edge with the longest path to a headwater
+3) if no named edges; then it  picks the edge with the longest path to a headwater.
+

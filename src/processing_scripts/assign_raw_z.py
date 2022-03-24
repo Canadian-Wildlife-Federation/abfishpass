@@ -35,12 +35,8 @@ import psycopg2.extras
 watershed_id = appconfig.config['PROCESSING']['watershed_id']
 dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
 
-dbSourceSchema = appconfig.config['DATABASE']['data_schema']
-dbSourceTable = appconfig.config['DATABASE']['stream_table']
-dbSourceId = "id"
-dbSourceGeom = "geometry"
-dbTargetTable = appconfig.config['ELEVATION_PROCESSING']['target_table']
-dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['target_3dgeometry_field']
+dbTargetTable = appconfig.config['PROCESSING']['stream_table']
+dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['3dgeometry_field']
 demDir = appconfig.config['ELEVATION_PROCESSING']['dem_directory'];
 
 demfiles = []
@@ -68,21 +64,7 @@ def prepareOutput(conn):
     force3dfunction = f"""{appconfig.dataSchema}.st_force3d"""
     
     query = f"""
-    CREATE SCHEMA IF NOT EXISTS {dbTargetSchema};
-    
-    CREATE TABLE IF NOT EXISTS {dbTargetSchema}.{dbTargetTable}(
-      id uuid not null,
-      watershed_id varchar not null,
-      {dbTargetGeom} geometry(LineStringZ, {appconfig.dataSrid}),
-      primary key (id)
-    );
-    
-    --ensure results are readable
-    GRANT USAGE ON SCHEMA {dbTargetSchema} TO public;
-    GRANT SELECT ON {dbTargetSchema}.{dbTargetTable} to public;
-    
-    DELETE FROM {dbTargetSchema}.{dbTargetTable} WHERE watershed_id = '{watershed_id}';
-
+   
     --this function exists on newer 3.x+ version of PostGIS and can be
     --removed if using newer version
     create function {force3dfunction}(p1 geometry, p2 int) RETURNS geometry AS
@@ -106,10 +88,11 @@ def prepareOutput(conn):
     $$
     LANGUAGE plpgsql;
     
-    INSERT INTO {dbTargetSchema}.{dbTargetTable} (id, watershed_id, {dbTargetGeom})
-    SELECT {dbSourceId}, watershed_id, {force3dfunction}({dbSourceGeom}, {appconfig.NODATA})
-    FROM {dbSourceSchema}.{dbSourceTable}
-    WHERE watershed_id = '{watershed_id}';
+    ALTER TABLE {dbTargetSchema}.{dbTargetTable} 
+    ADD COLUMN IF NOT EXISTS {dbTargetGeom} geometry(LineStringZ, {appconfig.dataSrid});
+
+    UPDATE {dbTargetSchema}.{dbTargetTable} 
+    SET {dbTargetGeom} = {force3dfunction}({appconfig.dbGeomField}, {appconfig.NODATA}); 
     
     DROP FUNCTION {force3dfunction}(geometry, int);
     """
@@ -166,9 +149,9 @@ def processArea(demfile, connection, onlymissing = False):
         SELECT srid 
         FROM public.geometry_columns
         WHERE
-        f_table_schema = '{dbSourceSchema}' and 
-        f_table_name = '{dbSourceTable}' and 
-        f_geometry_column = '{dbSourceGeom}'
+        f_table_schema = '{dbTargetSchema}' and 
+        f_table_name = '{dbTargetTable}' and 
+        f_geometry_column = '{appconfig.dbGeomField}'
     """
     srid = -9999;
     
@@ -181,7 +164,7 @@ def processArea(demfile, connection, onlymissing = False):
         query = f"""
             WITH ids AS (
                 SELECT distinct id FROM (
-                    SELECT id,st_z ((ST_DumpPoints({dbTargetGeom})).geom ) AS z 
+                    SELECT {appconfig.dbIdField}, st_z ((ST_DumpPoints({dbTargetGeom})).geom ) AS z 
                     FROM {dbTargetSchema}.{dbTargetTable}
                 ) foo WHERE foo.z = {appconfig.NODATA}
             ),
@@ -193,10 +176,10 @@ def processArea(demfile, connection, onlymissing = False):
                   ),{srid}
                 ) as bbox
             )
-            SELECT t.id as id, st_transform(t.{dbTargetGeom}, {demfile.srid}) as geometry
+            SELECT t.{appconfig.dbIdField} as id, st_transform(t.{dbTargetGeom}, {demfile.srid}) as geometry
             FROM {dbTargetSchema}.{dbTargetTable} t, env
-            WHERE t.{dbTargetGeom} && env.bbox AND t.watershed_id = '{watershed_id}'
-            AND t.id in (select id from ids);
+            WHERE t.{dbTargetGeom} && env.bbox AND t.{appconfig.dbWatershedIdField} = '{watershed_id}'
+            AND t.{appconfig.dbIdField} in (select id from ids);
         """
     else:
         #load all features
@@ -210,9 +193,9 @@ def processArea(demfile, connection, onlymissing = False):
                   ),{srid}
                 ) as bbox
             )
-            SELECT t.id as id, st_transform(t.{dbTargetGeom}, {demfile.srid}) as geometry
+            SELECT t.{appconfig.dbIdField} as id, st_transform(t.{dbTargetGeom}, {demfile.srid}) as geometry
             FROM {dbTargetSchema}.{dbTargetTable} t, env
-            WHERE t.{dbTargetGeom} && env.bbox AND t.watershed_id = '{watershed_id}'
+            WHERE t.{dbTargetGeom} && env.bbox AND t.{appconfig.dbWatershedIdField} = '{watershed_id}'
         """
     #print(query)
 
@@ -242,7 +225,7 @@ def processArea(demfile, connection, onlymissing = False):
     updatequery = f"""
         UPDATE {dbTargetSchema}.{dbTargetTable} 
         set {dbTargetGeom} = st_setsrid(st_geomfromwkb(%s),{srid})
-        WHERE {dbSourceId} = %s
+        WHERE {appconfig.dbIdField} = %s
     """
     
     with connection.cursor() as cursor2:
