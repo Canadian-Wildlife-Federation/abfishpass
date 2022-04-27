@@ -35,7 +35,7 @@ cabdPort = appconfig.config['CABD_DATABASE']['port'];
 cabdName = appconfig.config['CABD_DATABASE']['name'];
 cabdUser = appconfig.config['CABD_DATABASE']['user'];
 cabdPassword = appconfig.config['CABD_DATABASE']['password'];
-
+cabdBuffer = appconfig.config['CABD_DATABASE']['buffer'];
 
 def connectCabd():
     return pg2.connect(database=cabdName,
@@ -69,7 +69,7 @@ with appconfig.connectdb() as conn:
     
     #get bounds of dataset
     query = f"""
-        select st_buffer(st_convexhull(st_collect(geometry)), 200) 
+        select st_buffer(st_convexhull(st_collect(geometry)), {cabdBuffer}) 
         from {dbTargetSchema}.{dbTargetStreamTable}
     """
     
@@ -80,6 +80,7 @@ with appconfig.connectdb() as conn:
         
         extentgeom = data[0];
         
+    
     barriers = (("Dams", "dams.dams", "dam", "case when dam_name_en is not null then dam_name_en else dam_name_fr end"),
                 ("Waterfalls", "waterfalls.waterfalls", "waterfall", "case when fall_name_en is not null then fall_name_en else fall_name_fr end")
                 )
@@ -103,7 +104,7 @@ with appconfig.connectdb() as conn:
             from {dataset[1]}, boundary
             where st_intersects(original_point, boundary.geom) 
         """
-    
+
         newdata = []
      
         with connectCabd() as cabdconn:
