@@ -21,6 +21,7 @@ import os
 import psycopg2 as pg2
 import psycopg2.extras
 import sys
+import enum 
 
 NODATA = -999999
 
@@ -46,12 +47,21 @@ dbPassword = config['DATABASE']['password'];
 
 dataSchema = config['DATABASE']['data_schema'];
 streamTable = config['DATABASE']['stream_table'];
+streamTableVelocityField = "velocity";
+streamTableChannelConfinementField = "channel_confinement";
+fishSpeciesTable = config['DATABASE']['fish_species_table'];
 
 dataSrid = config['DATABASE']['working_srid']  
 
 dbIdField = "id"
 dbGeomField = "geometry"
 dbWatershedIdField = "watershed_id"
+
+class Accessibility(enum.Enum):
+    ACCESSIBLE = 'ACCESSIBLE'
+    POTENTIAL = 'POTENTIALLY ACCESSIBLE'
+    NOT = 'NOT ACCESSIBLE'
+
 
 print(f"""--- Configuration Settings Begin ---
 Database: {dbHost}:{dbPort}:{dbName}:{dbUser}

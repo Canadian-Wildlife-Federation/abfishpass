@@ -17,7 +17,6 @@
 #----------------------------------------------------------------------------------
 
 #
-# snaps barriers to the stream table
 # ASSUMPTION - data is in equal area projection where distance functions return values in metres
 #
 import appconfig
@@ -36,20 +35,32 @@ with appconfig.connectdb() as conn:
           source_id uuid not null,
           {appconfig.dbWatershedIdField} varchar not null,
           stream_name varchar,
+          strahler_order integer,
           geometry geometry(LineString, {appconfig.dataSrid}),
           primary key ({appconfig.dbIdField})
         );
     
+        CREATE INDEX {dbTargetSchema}_{dbTargetStreamTable}_geometry_idx ON  {dbTargetSchema}.{dbTargetStreamTable} using gist(geometry);
+        
         --ensure results are readable
         GRANT USAGE ON SCHEMA {dbTargetSchema} TO public;
         GRANT SELECT ON {dbTargetSchema}.{dbTargetStreamTable} to public;
     
         DELETE FROM {dbTargetSchema}.{dbTargetStreamTable} WHERE {appconfig.dbWatershedIdField} = '{workingWatershedId}';
 
-        INSERT INTO {dbTargetSchema}.{dbTargetStreamTable} ({appconfig.dbIdField}, source_id, {appconfig.dbWatershedIdField}, stream_name, geometry)
-        SELECT uuid_generate_v4(), {appconfig.dbIdField}, {appconfig.dbWatershedIdField}, stream_name, geometry
+        INSERT INTO {dbTargetSchema}.{dbTargetStreamTable} ({appconfig.dbIdField}, source_id, {appconfig.dbWatershedIdField}, stream_name, strahler_order, geometry)
+        SELECT uuid_generate_v4(), {appconfig.dbIdField}, {appconfig.dbWatershedIdField}, stream_name, strahler_order, geometry
         FROM {appconfig.dataSchema}.{appconfig.streamTable}
         WHERE {appconfig.dbWatershedIdField} = '{workingWatershedId}';
+        
+        
+        --TODO: remove this when values are provided
+        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} add column {appconfig.streamTableChannelConfinementField} numeric;
+        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} add column {appconfig.streamTableVelocityField} numeric;
+        
+        UPDATE {dbTargetSchema}.{dbTargetStreamTable} set {appconfig.streamTableChannelConfinementField} = floor(random() * 100);
+        UPDATE {dbTargetSchema}.{dbTargetStreamTable} set {appconfig.streamTableVelocityField} = floor(random() * 100);
+        
    
     """
     with conn.cursor() as cursor:

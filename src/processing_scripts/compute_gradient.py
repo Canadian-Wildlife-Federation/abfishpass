@@ -21,6 +21,9 @@
 # Assume - data projection is m length projection or else need to modify how length is computed
 # Requires stream name field, in this field a value of UNNAMED represents no-name
 #
+# In addition to computing vertex and segment gradient it also computes the
+# maximum vertex gradient for the stream segment
+#
 import appconfig
 
 dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
@@ -37,6 +40,8 @@ dbUpMeasureField = appconfig.config['MAINSTEM_PROCESSING']['upstream_route_measu
 
 db4dGeomField = "geometryzm"
 dbSegmentGradientField = appconfig.config['GRADIENT_PROCESSING']['segment_gradient_field']
+dbMaxGradientField = appconfig.config['GRADIENT_PROCESSING']['max_vertex_gradient_field']
+
  
 def setupGeometry(connection):
     
@@ -99,7 +104,8 @@ def computeVertexGraidents(connection):
               ELSE 0
         END;
 
-
+        
+        
  --SELECT
     --mainstem_id,
     --min(downstream_route_measure) AS downstream_route_measure,
@@ -141,14 +147,46 @@ def computeSegmentGradient(connection):
         cursor.execute(query)    
             
     connection.commit()
+
+
+def computeMaxSegmentGradient(connection):
     
+    query = f"""
+        CREATE INDEX {dbTargetSchema}_{dbVertexTable}_vertex_pnt_idx on {dbTargetSchema}.{dbVertexTable} using gist(vertex_pnt);
+
+        --compute a max gradient for each stream segments based on the vertex points
+        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} 
+            add column if not exists {dbMaxGradientField} double precision;
+
+        UPDATE {dbTargetSchema}.{dbTargetStreamTable} set {dbMaxGradientField} = null;
+        
+        WITH gvalues AS (
+            SELECT a.id, max(b.gradient) as maxv
+            FROM {dbTargetSchema}.{dbVertexTable} b, {dbTargetSchema}.{dbTargetStreamTable} a
+            WHERE st_intersects(a.geometry, b.vertex_pnt)
+            GROUP BY a.id)
+        UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+        SET {dbMaxGradientField} = gvalues.maxv 
+        FROM gvalues 
+        WHERE gvalues.id = streams.id;
+
+        UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+        SET {dbMaxGradientField} = {dbSegmentGradientField} 
+        WHERE {dbMaxGradientField} is null;
+    """
+        
+    #print (query)
+    with connection.cursor() as cursor:
+        cursor.execute(query)    
+            
+    connection.commit()    
 #--- main program ---    
 with appconfig.connectdb() as conn:
     
     conn.autocommit = False
     
     print("Computing Gradient")
-    print(" setting up tables")
+    print("  setting up tables")
     setupGeometry(conn)
     
     print("  computing vertex gradients")
@@ -156,5 +194,7 @@ with appconfig.connectdb() as conn:
     
     print("  computing segment gradients")
     computeSegmentGradient(conn)
+    computeMaxSegmentGradient(conn)
+    
 print("done")
 

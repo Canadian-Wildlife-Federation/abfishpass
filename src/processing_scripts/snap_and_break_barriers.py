@@ -28,6 +28,8 @@ dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 watershed_id = appconfig.config['PROCESSING']['watershed_id']
+snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
+
 
 with appconfig.connectdb() as conn:
     
@@ -50,7 +52,7 @@ with appconfig.connectdb() as conn:
         END;
     $$ LANGUAGE plpgsql;
      
-    SELECT public.snap_to_network('{dbTargetSchema}', '{dbBarrierTable}', 'original_point', 'snapped_point', '100');
+    SELECT public.snap_to_network('{dbTargetSchema}', '{dbBarrierTable}', 'original_point', 'snapped_point', '{snapDistance}');
        
     """
     with conn.cursor() as cursor:
@@ -81,7 +83,11 @@ with appconfig.connectdb() as conn:
     
     SELECT z.{appconfig.dbIdField},
             y.source_id,
-          y.{appconfig.dbWatershedIdField}, 
+            y.{appconfig.dbWatershedIdField},
+            y.stream_name,
+            y.strahler_order,
+            {appconfig.streamTableChannelConfinementField},
+            {appconfig.streamTableVelocityField},
             st_geometryn(z.geometry, generate_series(1, st_numgeometries(z.geometry))) as geometry
     FROM newlines z JOIN {dbTargetSchema}.{dbTargetStreamTable} y 
          ON y.{appconfig.dbIdField} = z.{appconfig.dbIdField};
@@ -89,8 +95,13 @@ with appconfig.connectdb() as conn:
     DELETE FROM {dbTargetSchema}.{dbTargetStreamTable} 
     WHERE {appconfig.dbIdField} IN (SELECT {appconfig.dbIdField} FROM newstreamlines);
     
-    INSERT INTO  {dbTargetSchema}.{dbTargetStreamTable}({appconfig.dbIdField}, source_id, {appconfig.dbWatershedIdField}, geometry)
-    SELECT  uuid_generate_v4(), a.source_id, a.{appconfig.dbWatershedIdField}, a.geometry
+          
+    INSERT INTO  {dbTargetSchema}.{dbTargetStreamTable} 
+        (id, source_id, {appconfig.dbWatershedIdField}, stream_name, strahler_order, 
+        {appconfig.streamTableChannelConfinementField},{appconfig.streamTableVelocityField} , geometry)
+    SELECT  uuid_generate_v4(), a.source_id, a.{appconfig.dbWatershedIdField}, 
+        a.stream_name, a.strahler_order, a.{appconfig.streamTableChannelConfinementField},
+        a.{appconfig.streamTableVelocityField}, a.geometry
     FROM newstreamlines a;
     
     DROP TABLE newstreamlines; 

@@ -32,9 +32,14 @@ from processing_scripts import preprocess_watershed
 from processing_scripts import load_barriers_cabd 
 from processing_scripts import load_fishobservation
 from processing_scripts import snap_and_break_barriers
+from processing_scripts import compute_updown_barriers_fish
 from processing_scripts import assign_raw_z
 from processing_scripts import smooth_z
 from processing_scripts import compute_mainstems
 from processing_scripts import compute_gradient
+from processing_scripts import compute_gradient_accessibility
+from processing_scripts import compute_habitat_models
+from processing_scripts import compute_modelled_crossings
+from processing_scripts import compute_modelled_crossings_upstream_values
 
 print ("Processing Complete: " + workingWatershedId)
