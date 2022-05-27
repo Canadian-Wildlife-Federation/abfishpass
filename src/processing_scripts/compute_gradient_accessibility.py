@@ -33,9 +33,8 @@ dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
 watershed_id = appconfig.config['PROCESSING']['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
-dbMaxDownGradientField = appconfig.config['GRADIENT_PROCESSING']['max_downstream_graident_field']
-dbMaxGradientField = appconfig.config['GRADIENT_PROCESSING']['max_vertex_gradient_field']
-
+dbMaxDownGradientField = appconfig.config['GRADIENT_PROCESSING']['max_downstream_gradient_field']
+dbSegmentGradientField = appconfig.config['GRADIENT_PROCESSING']['segment_gradient_field']
 
 
 edges = []
@@ -82,7 +81,7 @@ class Edge:
 def createNetwork(connection):
     query = f"""
         SELECT a.{appconfig.dbIdField} as id, 
-            {dbMaxGradientField}, a.{appconfig.dbGeomField}
+            {dbSegmentGradientField}, a.{appconfig.dbGeomField}
         FROM {dbTargetSchema}.{dbTargetStreamTable} a
     """
    
@@ -196,35 +195,43 @@ def computeAccessibility(connection):
             """
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
-        
-#--- main program ---    
-with appconfig.connectdb() as conn:
-    
-    conn.autocommit = False
-    
-    print("Computing Gradient Accessability Per Species")
-    print("  creating output column")
-    #add a new geometry column for output removing existing one
-    query = f"""
-        alter table {dbTargetSchema}.{dbTargetStreamTable} 
-            add column if not exists {dbMaxDownGradientField} double precision;
-        
-        update {dbTargetSchema}.{dbTargetStreamTable} set {dbMaxDownGradientField} = null;
-    """
-    with conn.cursor() as cursor:
-        cursor.execute(query)
-        
-    print("  creating network")
-    createNetwork(conn)
-    
-    print("  computing downstream gradient")
-    processNodes()
-    
-    print("  saving results")
-    writeResults(conn)
-    
-    print("  computing accessiblity per species")
-    computeAccessibility(conn)
-    
-print("done")
 
+def main():        
+    #--- main program ---
+    
+    edges.clear()
+    nodes.clear()
+            
+    with appconfig.connectdb() as conn:
+        
+        conn.autocommit = False
+        
+        print("Computing Gradient Accessability Per Species")
+        print("  creating output column")
+        #add a new geometry column for output removing existing one
+        query = f"""
+            alter table {dbTargetSchema}.{dbTargetStreamTable} 
+                add column if not exists {dbMaxDownGradientField} double precision;
+            
+            update {dbTargetSchema}.{dbTargetStreamTable} set {dbMaxDownGradientField} = null;
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            
+        print("  creating network")
+        createNetwork(conn)
+        
+        print("  computing downstream gradient")
+        processNodes()
+        
+        print("  saving results")
+        writeResults(conn)
+        
+        print("  computing accessiblity per species")
+        computeAccessibility(conn)
+        
+    print("done")
+
+    
+if __name__ == "__main__":
+    main() 

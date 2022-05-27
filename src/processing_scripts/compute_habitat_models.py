@@ -27,7 +27,7 @@ from appconfig import dataSchema
 dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
-dbMaxGradientField = appconfig.config['GRADIENT_PROCESSING']['max_vertex_gradient_field']
+dbSegmentGradientField = appconfig.config['GRADIENT_PROCESSING']['segment_gradient_field']
 
     
 def computeGradientModel(connection):
@@ -66,20 +66,20 @@ def computeGradientModel(connection):
                 {code}_accessibility in ( '{appconfig.Accessibility.ACCESSIBLE.value}',
                     '{appconfig.Accessibility.POTENTIAL.value}')
                 AND 
-                {dbMaxGradientField} >= {mingradient} 
+                {dbSegmentGradientField} >= {mingradient} 
                 AND 
-                {dbMaxGradientField} < {maxgradient}
+                {dbSegmentGradientField} < {maxgradient}
                 
             """
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
 
 
-def computeVelocityModel(connection):
+def computeDischargeModel(connection):
         
     query = f"""
         SELECT code, name, 
-        habitat_velocity_min, habitat_velocity_max
+        habitat_discharge_min, habitat_discharge_max
         FROM {dataSchema}.{appconfig.fishSpeciesTable};
     """
 
@@ -95,7 +95,7 @@ def computeVelocityModel(connection):
             
             print("  processing " + name)
             
-            colname = "habitat_velocity_" + code; 
+            colname = "habitat_discharge_" + code; 
             
             query = f"""
             
@@ -111,9 +111,9 @@ def computeVelocityModel(connection):
                 {code}_accessibility in ( '{appconfig.Accessibility.ACCESSIBLE.value}',
                     '{appconfig.Accessibility.POTENTIAL.value}')
                 AND 
-                {appconfig.streamTableVelocityField} >= {minvelocity} 
+                {appconfig.streamTableDischargeField} >= {minvelocity} 
                 AND 
-                {appconfig.streamTableVelocityField} < {maxvelocity}
+                {appconfig.streamTableDischargeField} < {maxvelocity}
                 
             """
             with connection.cursor() as cursor2:
@@ -150,36 +150,32 @@ def computeConfinementModel(connection):
                 update {dbTargetSchema}.{dbTargetStreamTable} 
                     set {colname} = false;
                 
+                --TODO: implement model when defined
                 UPDATE {dbTargetSchema}.{dbTargetStreamTable}
-                set {colname} = true
-                WHERE
-                {code}_accessibility in ( '{appconfig.Accessibility.ACCESSIBLE.value}',
-                    '{appconfig.Accessibility.POTENTIAL.value}')
-                AND 
-                {appconfig.streamTableChannelConfinementField} >= {mincc} 
-                AND 
-                {appconfig.streamTableChannelConfinementField} < {maxcc}
-                
+                set {colname} = true;                
             """
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
-                                        
-#--- main program ---    
-with appconfig.connectdb() as conn:
-    
-    conn.autocommit = False
-    
-    print("Computing Habitat Models Per Species")
-    
-    print("  computing graident models per species")
-    computeGradientModel(conn)
-    
-    print("  computing velocity models per species")
-    computeVelocityModel(conn)
-    
-    print("  computing velocity models per species")
-    computeConfinementModel(conn)
-    
-    
-print("done")
+            
+def main():                            
+    #--- main program ---    
+    with appconfig.connectdb() as conn:
+        
+        conn.autocommit = False
+        
+        print("Computing Habitat Models Per Species")
+        
+        print("  computing graident models per species")
+        computeGradientModel(conn)
+        
+        print("  computing discharge models per species")
+        computeDischargeModel(conn)
+        
+        print("  computing channel confinement models per species")
+        computeConfinementModel(conn)
+        
+    print("done")
 
+
+if __name__ == "__main__":
+    main()  

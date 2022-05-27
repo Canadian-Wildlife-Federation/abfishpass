@@ -25,6 +25,7 @@ import appconfig
 import shapely.wkb
 from collections import deque
 import psycopg2.extras
+from processing_scripts.compute_updown_barriers_fish import dbModelledCrossingsTable
 
 dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
 watershed_id = appconfig.config['PROCESSING']['watershed_id']
@@ -87,7 +88,7 @@ def createNetwork(connection):
         for feature in features:
             species.append(feature[0])
             accessabilitymodel = accessabilitymodel + ', ' + feature[0] + '_accessibility'
-            habitatmodel = habitatmodel + ', habitat_velocity_' + feature[0] + ' AND habitat_gradient_' + feature[0] + ' AND habitat_channelconfinement_' + feature[0] 
+            habitatmodel = habitatmodel + ', habitat_discharge_' + feature[0] + ' AND habitat_gradient_' + feature[0] + ' AND habitat_channelconfinement_' + feature[0] 
             
     
     
@@ -171,13 +172,9 @@ def processNodes():
             funchabitat[fish] = 0
         
         outbarriercnt = 0;
-        for inedge in node.inedges:
-            if inedge.upbarriercnt > outbarriercnt:
-                outbarriercnt = inedge.upbarriercnt
-        
-        
         
         for inedge in node.inedges:
+            outbarriercnt += inedge.upbarriercnt
                 
             if not inedge.visited:
                 allvisited = False;
@@ -265,46 +262,33 @@ def writeResults(connection):
             --upstream accessible
             ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS total_upstr_pot_access_{fish};
             ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN total_upstr_pot_access_{fish} numeric;
-    
             
-            UPDATE {dbTargetSchema}.{dbCrossingsTable} SET total_upstr_pot_access_{fish} = 
-            CASE WHEN b.{fish}_accessibility in ('{appconfig.Accessibility.ACCESSIBLE.value}', '{appconfig.Accessibility.POTENTIAL.value}') THEN
-                a.total_upstr_pot_access_{fish} - st_length(b.geometry) + {dbTargetSchema}.{dbCrossingsTable}.stream_measure * st_length(b.geometry)
-            ELSE
-                a.total_upstr_pot_access_{fish} 
-            END
+            UPDATE {dbTargetSchema}.{dbCrossingsTable} 
+            SET total_upstr_pot_access_{fish} = a.total_upstr_pot_access_{fish} / 1000.0 
             FROM {dbTargetSchema}.temp a, {dbTargetSchema}.{dbTargetStreamTable} b 
             WHERE a.stream_id = b.id AND 
-            a.stream_id = {dbTargetSchema}.{dbCrossingsTable}.stream_id;
+                  a.stream_id = {dbTargetSchema}.{dbCrossingsTable}.stream_id_up;
 
 
             --all upstream habitat
             ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS total_upstr_hab_{fish};
             ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN total_upstr_hab_{fish} numeric;
     
-            UPDATE {dbTargetSchema}.{dbCrossingsTable} SET  total_upstr_hab_{fish} = 
-            CASE WHEN b.habitat_gradient_{fish} AND b.habitat_velocity_{fish} AND b.habitat_channelconfinement_{fish} THEN
-                a.total_upstr_hab_{fish} - st_length(b.geometry) + {dbTargetSchema}.{dbCrossingsTable}.stream_measure * st_length(b.geometry)
-            ELSE
-                a.total_upstr_hab_{fish} 
-            END           
+            UPDATE {dbTargetSchema}.{dbCrossingsTable} 
+            SET  total_upstr_hab_{fish} = a.total_upstr_hab_{fish} / 1000.0 
             FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
             WHERE a.stream_id = b.id AND 
-            a.stream_id = {dbTargetSchema}.{dbCrossingsTable}.stream_id;  
+                a.stream_id = {dbTargetSchema}.{dbCrossingsTable}.stream_id_up;  
             
             --function upstream habitat
             ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS func_upstr_hab_{fish};
             ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN func_upstr_hab_{fish} numeric;
     
-            UPDATE {dbTargetSchema}.{dbCrossingsTable} SET  func_upstr_hab_{fish} = 
-            CASE WHEN b.habitat_gradient_{fish} AND b.habitat_velocity_{fish} AND b.habitat_channelconfinement_{fish} THEN
-                a.func_upstr_hab_{fish} - st_length(b.geometry) + {dbTargetSchema}.{dbCrossingsTable}.stream_measure * st_length(b.geometry)
-            ELSE
-                a.func_upstr_hab_{fish} 
-            END           
+            UPDATE {dbTargetSchema}.{dbCrossingsTable} 
+            SET  func_upstr_hab_{fish} = a.func_upstr_hab_{fish} / 1000.0 
             FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
             WHERE a.stream_id = b.id AND 
-            a.stream_id = {dbTargetSchema}.{dbCrossingsTable}.stream_id;        
+                a.stream_id = {dbTargetSchema}.{dbCrossingsTable}.stream_id_up;        
         """
         with connection.cursor() as cursor:
             cursor.execute(query)
@@ -318,20 +302,61 @@ def writeResults(connection):
     connection.commit()
 
 
-#--- main program ---    
-with appconfig.connectdb() as conn:
+def assignBarrierSpeciesCounts(connection):
     
-    conn.autocommit = False
-    
-    print("Computing Habitat Models for Modelled Crossings")
-    
-    print("  creating network")
-    createNetwork(conn)
-    
-    print("  processing nodes")
-    processNodes()
+    query = f"""
+        UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
+        SET species_upstr = a.fish_survey_up,
+            stock_upstr = a.fish_stock_up,
+            barrier_cnt_upstr = a.barrier_up_cnt,
+            barriers_upstr = a.barriers_up
+        FROM {dbTargetSchema}.{dbTargetStreamTable} a
+        WHERE a.id =  {dbTargetSchema}.{dbModelledCrossingsTable}.stream_id_up;
         
-    print("  writing results")
-    writeResults(conn)
+        UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
+        SET species_downstr = a.fish_survey_down,
+            stock_downstr = a.fish_stock_down,
+            barrier_cnt_downstr = a.barrier_down_cnt,
+            barriers_downstr = a.barriers_down
+        FROM {dbTargetSchema}.{dbTargetStreamTable} a
+        WHERE a.id =  {dbTargetSchema}.{dbModelledCrossingsTable}.stream_id_down;
+        
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query)             
+
+    connection.commit()
     
-print("done")
+    
+#--- main program ---
+def main():
+
+    edges.clear()
+    nodes.clear()
+    species.clear()    
+        
+    with appconfig.connectdb() as conn:
+        
+        conn.autocommit = False
+        
+        print("Computing Habitat Models for Modelled Crossings")
+        
+        print("  assigning barrier and species counts")
+        assignBarrierSpeciesCounts(conn)
+        
+        print("  creating network")
+        createNetwork(conn)
+        
+        print("  processing nodes")
+        processNodes()
+            
+        print("  writing results")
+        writeResults(conn)
+        
+        
+        
+    print("done")
+    
+
+if __name__ == "__main__":
+    main()      

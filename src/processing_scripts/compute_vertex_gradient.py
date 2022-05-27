@@ -39,9 +39,6 @@ dbDownMeasureField = appconfig.config['MAINSTEM_PROCESSING']['downstream_route_m
 dbUpMeasureField = appconfig.config['MAINSTEM_PROCESSING']['upstream_route_measure']
 
 db4dGeomField = "geometryzm"
-dbSegmentGradientField = appconfig.config['GRADIENT_PROCESSING']['segment_gradient_field']
-dbMaxGradientField = appconfig.config['GRADIENT_PROCESSING']['max_vertex_gradient_field']
-
  
 def setupGeometry(connection):
     
@@ -105,28 +102,10 @@ def computeVertexGraidents(connection):
         END;
 
         
-        
- --SELECT
-    --mainstem_id,
-    --min(downstream_route_measure) AS downstream_route_measure,
-    --grade_class as gradient_class
-  --FROM
- -- (
-    --SELECT
-    --  mainstem_id,
-    --  downstream_route_measure,
-    --  grade_class,
-    --  count(step OR NULL) OVER (ORDER BY mainstem_id, downstream_route_measure) AS grp
-    --FROM  (
-     -- SELECT mainstem_id, downstream_route_measure, grade_class
-     --      , lag(grade_class, 1, grade_class) OVER (ORDER BY mainstem_id, downstream_route_measure) <> grade_class AS step
-    --  FROM ws17010302.vertex_gradient
-   -- ) sub1
-  --WHERE grade_class != 0
-  --) sub2
-  --GROUP BY mainstem_id, grade_class, grp
-  --ORDER BY mainstem_id, downstream_route_measure
+        alter table {dbTargetSchema}.{dbTargetStreamTable} 
+        drop column {db4dGeomField};
     """
+    
     #print (query)
     with connection.cursor() as cursor:
         cursor.execute(query)    
@@ -134,67 +113,23 @@ def computeVertexGraidents(connection):
     connection.commit()
 
 
-def computeSegmentGradient(connection):
 
-    query = f"""
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN IF NOT EXISTS {dbSegmentGradientField} double precision;
+
+def main():
+    #--- main program ---    
+    with appconfig.connectdb() as conn:
         
-        UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-        SET {dbSegmentGradientField} = (ST_Z (ST_PointN ({db4dGeomField}, 1)) - ST_Z (ST_PointN ({db4dGeomField}, -1))) / ST_Length ({db4dGeomField})
-    """
-    #print (query)
-    with connection.cursor() as cursor:
-        cursor.execute(query)    
-            
-    connection.commit()
-
-
-def computeMaxSegmentGradient(connection):
-    
-    query = f"""
-        CREATE INDEX {dbTargetSchema}_{dbVertexTable}_vertex_pnt_idx on {dbTargetSchema}.{dbVertexTable} using gist(vertex_pnt);
-
-        --compute a max gradient for each stream segments based on the vertex points
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} 
-            add column if not exists {dbMaxGradientField} double precision;
-
-        UPDATE {dbTargetSchema}.{dbTargetStreamTable} set {dbMaxGradientField} = null;
+        conn.autocommit = False
         
-        WITH gvalues AS (
-            SELECT a.id, max(b.gradient) as maxv
-            FROM {dbTargetSchema}.{dbVertexTable} b, {dbTargetSchema}.{dbTargetStreamTable} a
-            WHERE st_intersects(a.geometry, b.vertex_pnt)
-            GROUP BY a.id)
-        UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-        SET {dbMaxGradientField} = gvalues.maxv 
-        FROM gvalues 
-        WHERE gvalues.id = streams.id;
-
-        UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-        SET {dbMaxGradientField} = {dbSegmentGradientField} 
-        WHERE {dbMaxGradientField} is null;
-    """
+        print("Computing Gradient")
+        print("  setting up tables")
+        setupGeometry(conn)
         
-    #print (query)
-    with connection.cursor() as cursor:
-        cursor.execute(query)    
-            
-    connection.commit()    
-#--- main program ---    
-with appconfig.connectdb() as conn:
-    
-    conn.autocommit = False
-    
-    print("Computing Gradient")
-    print("  setting up tables")
-    setupGeometry(conn)
-    
-    print("  computing vertex gradients")
-    computeVertexGraidents(conn)
-    
-    print("  computing segment gradients")
-    computeSegmentGradient(conn)
-    computeMaxSegmentGradient(conn)
-    
-print("done")
+        print("  computing vertex gradients")
+        computeVertexGraidents(conn)
+        
+        
+    print("done")
 
+if __name__ == "__main__":
+    main() 

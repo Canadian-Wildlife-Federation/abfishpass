@@ -47,7 +47,7 @@ dbPassword = config['DATABASE']['password'];
 
 dataSchema = config['DATABASE']['data_schema'];
 streamTable = config['DATABASE']['stream_table'];
-streamTableVelocityField = "velocity";
+streamTableDischargeField = "discharge";
 streamTableChannelConfinementField = "channel_confinement";
 fishSpeciesTable = config['DATABASE']['fish_species_table'];
 

@@ -241,7 +241,9 @@ def writeResults(connection):
     newdata = []
     
     for edge in edges:
-        newdata.append( (edge.mainstemid, edge.downstreammeasure, edge.downstreammeasure + edge.length, edge.fid) )
+        downmeasurekm = (edge.downstreammeasure)
+        upmeasurekm = (edge.downstreammeasure + edge.length)
+        newdata.append( (edge.mainstemid, downmeasurekm, upmeasurekm, edge.fid) )
     
     with connection.cursor() as cursor:    
         psycopg2.extras.execute_batch(cursor, updatequery, newdata);
@@ -249,39 +251,46 @@ def writeResults(connection):
     connection.commit()
 
 
-#--- main program ---    
-with appconfig.connectdb() as conn:
+#--- main program ---  
+def main():  
+    edges.clear()
+    nodes.clear()
     
-    conn.autocommit = False
-    
-    print("Computing Mainstems")
-    print("  creating output column")
-    #add a new geometry column for output removing existing one
-    query = f"""
-        alter table {dbTargetSchema}.{dbTargetStreamTable} 
-            add column if not exists {dbMainstemField} uuid;
+    with appconfig.connectdb() as conn:
+        
+        conn.autocommit = False
+        
+        print("Computing Mainstems")
+        print("  creating output column")
+        #add a new geometry column for output removing existing one
+        query = f"""
+            alter table {dbTargetSchema}.{dbTargetStreamTable} 
+                add column if not exists {dbMainstemField} uuid;
+                
+            alter table {dbTargetSchema}.{dbTargetStreamTable} 
+                add column if not exists {dbDownMeasureField} double precision;
             
-        alter table {dbTargetSchema}.{dbTargetStreamTable} 
-            add column if not exists {dbDownMeasureField} double precision;
+            alter table {dbTargetSchema}.{dbTargetStreamTable} 
+                add column if not exists {dbUpMeasureField} double precision;
+            
+            update {dbTargetSchema}.{dbTargetStreamTable} 
+              set {dbMainstemField} = null, 
+              {dbDownMeasureField} = null, 
+              {dbUpMeasureField} = null;
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
         
-        alter table {dbTargetSchema}.{dbTargetStreamTable} 
-            add column if not exists {dbUpMeasureField} double precision;
+        print("  creating network")
+        createNetwork(conn)
         
-        update {dbTargetSchema}.{dbTargetStreamTable} 
-          set {dbMainstemField} = null, 
-          {dbDownMeasureField} = null, 
-          {dbUpMeasureField} = null;
-    """
-    with conn.cursor() as cursor:
-        cursor.execute(query)
-    
-    print("  creating network")
-    createNetwork(conn)
-    
-    print("  processing nodes")
-    processNodes()
+        print("  processing nodes")
+        processNodes()
+            
+        print("  writing results")
+        writeResults(conn)
         
-    print("  writing results")
-    writeResults(conn)
-    
-print("done")
+    print("done")
+
+if __name__ == "__main__":
+    main()     

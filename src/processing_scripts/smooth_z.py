@@ -58,7 +58,7 @@ class Node:
         if (self.z == appconfig.NODATA or self.z == z):
             self.z = z
         else:
-            print("DIFFERENT Z VALUES AT SAME POSITION")
+            print("DIFFERENT Z VALUES AT SAME POSITION: POINT(" + str(self.x) + " " + str(self.y) + "): " +str(self.x) + " " +str(z))
     
 class Edge:
     def __init__(self, fromnode, tonode, fid, ls):
@@ -252,34 +252,42 @@ def writeResults(connection):
     
 
 #--- main program ---    
-with appconfig.connectdb() as conn:
+def main():
     
-    conn.autocommit = False
-    
-    print("Smoothing Elevation Values")
-    print("  creating output column")
-    #add a new geometry column for output removing existing one
-    query = f"""
-        ALTER TABLE {dbTargetSchema}.{dbTargetTable} drop column if exists {dbTargetGeom};        
-        ALTER TABLE {dbTargetSchema}.{dbTargetTable} add column {dbTargetGeom} geometry(linestringz, {appconfig.dataSrid});
-    """
-    with conn.cursor() as cursor:
-        cursor.execute(query)
-    
-    print("  creating network")
-    createNetwork(conn)
-    
-    print("  processing nodes")
-    processNodes()
-    
-    print("  processing edges")
-    processEdges()
-    
-    print("  writing results")
-    writeResults(conn)
-    
-print("done")
-      
+    edges.clear()
+    nodes.clear()
+
+    with appconfig.connectdb() as conn:
+        
+        conn.autocommit = False
+        
+        print("Smoothing Elevation Values")
+        print("  creating output column")
+        #add a new geometry column for output removing existing one
+        query = f"""
+            ALTER TABLE {dbTargetSchema}.{dbTargetTable} drop column if exists {dbTargetGeom};        
+            ALTER TABLE {dbTargetSchema}.{dbTargetTable} add column {dbTargetGeom} geometry(linestringz, {appconfig.dataSrid});
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+        
+        print("  creating network")
+        createNetwork(conn)
+        
+        print("  processing nodes")
+        processNodes()
+        
+        print("  processing edges")
+        processEdges()
+        
+        print("  writing results")
+        writeResults(conn)
+        
+    print("done")
+
+
+if __name__ == "__main__":
+    main()      
 #drop table working.points3d; 
 #
 #create table working.points3d as 

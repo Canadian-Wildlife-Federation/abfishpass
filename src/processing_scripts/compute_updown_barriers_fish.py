@@ -32,6 +32,7 @@ watershed_id = appconfig.config['PROCESSING']['watershed_id']
 
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
+dbModelledCrossingsTable = appconfig.config['MODELLED_CROSSINGS']['modelled_crossings_table']
 
 
 edges = []
@@ -123,7 +124,7 @@ def createNetwork(connection):
         select 'down', a.id, b.id 
         from {dbTargetSchema}.{dbBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
         where b.geometry && st_buffer(a.snapped_point, 0.0000001)
-            and st_distance(st_endpoint(b.geometry), a.snapped_point) < 0.00000001
+            and st_distance(st_endpoint(b.geometry), a.snapped_point) < 0.00000001        
     """
    
     #load geometries and create a network
@@ -317,48 +318,56 @@ def writeResults(connection):
     connection.commit()
 
 
-#--- main program ---    
-with appconfig.connectdb() as conn:
+#--- main program ---
+def main():
     
-    conn.autocommit = False
+    edges.clear()
+    nodes.clear()
+        
+    with appconfig.connectdb() as conn:
+        
+        conn.autocommit = False
+        
+        print("Computing Upstream/Downstream Barriers")
+        print("  creating output column")
+        #add a new geometry column for output removing existing one
+        query = f"""
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barrier_up_cnt;
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barrier_down_cnt;
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barriers_up;
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barriers_down;
+            
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS fish_stock_up;
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS fish_stock_down;
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS fish_survey_up;
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS fish_survey_down;
+            
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barrier_up_cnt int;
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barrier_down_cnt int;
+            
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_up varchar[];
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_down varchar[];
+            
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_stock_up varchar[];
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_stock_down varchar[];
+            
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_survey_up varchar[];
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_survey_down varchar[];
+        """
+        
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+        
+        print("  creating network")
+        createNetwork(conn)
+        
+        print("  processing nodes")
+        processNodes()
+            
+        print("  writing results")
+        writeResults(conn)
+        
+    print("done")
     
-    print("Computing Upstream/Downstream Barriers")
-    print("  creating output column")
-    #add a new geometry column for output removing existing one
-    query = f"""
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barrier_up_cnt;
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barrier_down_cnt;
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barriers_up;
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barriers_down;
-        
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS fish_stock_up;
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS fish_stock_down;
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS fish_survey_up;
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS fish_survey_down;
-        
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barrier_up_cnt int;
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barrier_down_cnt int;
-        
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_up varchar[];
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_down varchar[];
-        
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_stock_up varchar[];
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_stock_down varchar[];
-        
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_survey_up varchar[];
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_survey_down varchar[];
-    """
-    
-    with conn.cursor() as cursor:
-        cursor.execute(query)
-    
-    print("  creating network")
-    createNetwork(conn)
-    
-    print("  processing nodes")
-    processNodes()
-        
-    print("  writing results")
-    writeResults(conn)
-    
-print("done")
+if __name__ == "__main__":
+    main()      

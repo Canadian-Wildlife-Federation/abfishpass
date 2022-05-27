@@ -148,8 +148,8 @@ query = f"""
         habitat_gradient_min numeric,
         habitat_gradient_max numeric,
         
-        habitat_velocity_min numeric,
-        habitat_velocity_max numeric,
+        habitat_discharge_min numeric,
+        habitat_discharge_max numeric,
         
         habitat_channel_confinement_min numeric,
         habitat_channel_confinement_max numeric,
@@ -158,13 +158,13 @@ query = f"""
     );
     insert into {appconfig.dataSchema}.{appconfig.fishSpeciesTable}(
         code, name, allcodes, accessibility_gradient, 
-        habitat_gradient_min,habitat_gradient_max,habitat_velocity_min,habitat_velocity_max,
+        habitat_gradient_min,habitat_gradient_max,habitat_discharge_min,habitat_discharge_max,
         habitat_channel_confinement_min, habitat_channel_confinement_max)
     values 
-        ('argr', 'Arctic Grayling', ARRAY['argr'], 0.3, 0, 0.3, 0, 100, 0, 100),
-        ('wbtr', 'Western Arctic Bull Trout', ARRAY['wbtr', 'bltr'], 0.3, 0, 0.3, 0, 100, 0, 100),
-        ('mnwh', 'Mountain Whitefish', ARRAY['mnwh'], 0.3, 0, 0.3, 0, 100, 0, 100),
-        ('artr', 'Athabasca Rainbow Trout', ARRAY['artr', 'rntr'], 0.3, 0, 0.3, 0, 100, 0, 100);
+        ('argr', 'Arctic Grayling', ARRAY['argr'], 0.35, 0, 0.35, 0, 100, 0, 100),
+        ('wbtr', 'Western Arctic Bull Trout', ARRAY['wbtr', 'bltr'], 0.35, 0, 0.35, 0, 100, 0, 100),
+        ('mnwh', 'Mountain Whitefish', ARRAY['mnwh'], 0.35, 0, 0.35, 0, 100, 0, 100),
+        ('artr', 'Athabasca Rainbow Trout', ARRAY['artr', 'rntr'], 0.35, 0, 0.35, 0, 100, 0, 100);
 """
 #print (query)
 with appconfig.connectdb() as conn:

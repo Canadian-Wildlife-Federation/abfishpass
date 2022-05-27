@@ -27,11 +27,14 @@ dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbCrossingsTable = appconfig.config['MODELLED_CROSSINGS']['modelled_crossings_table']
-
+orderBarrierLimit = appconfig.config['MODELLED_CROSSINGS']['strahler_order_barrier_limit']
 
 roadTable = appconfig.config['CREATE_LOAD_SCRIPT']['road_table'];
 railTable = appconfig.config['CREATE_LOAD_SCRIPT']['rail_table'];
 trailTable = appconfig.config['CREATE_LOAD_SCRIPT']['trail_table'];
+    
+dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
+
     
 def createTable(connection):
     #note: we will add to this table for
@@ -159,159 +162,65 @@ def computeCrossings(connection):
         );
         
         
-        UPDATE {dbTargetSchema}.{dbCrossingsTable} set stream_measure = 
-        st_linelocatepoint(a.geometry, {dbTargetSchema}.{dbCrossingsTable}.geometry)
-        FROM {dbTargetSchema}.{dbTargetStreamTable} a
-        WHERE a.id = {dbTargetSchema}.{dbCrossingsTable}.stream_id
-        and {dbTargetSchema}.{dbCrossingsTable}.stream_id is not null;
-        
-        
-        --populate species_upstr
-        
-        UPDATE {dbTargetSchema}.{dbCrossingsTable} set species_upstr =
-        a.fish_survey_up
-        FROM {dbTargetSchema}.{dbTargetStreamTable} a
-        WHERE a.id = {dbTargetSchema}.{dbCrossingsTable}.stream_id;
-        
-        --add species observation on the same edge as the stream
-        --with a stream measure is greater than crossing measure 
-        with edgespecies as (
-            SELECT distinct  a.id, b.spec_code 
-            FROM 
-                {dbTargetSchema}.{dbCrossingsTable} a join 
-                {dbTargetSchema}.{appconfig.config['DATABASE']['fish_survey_table']} b on a.stream_id = b.stream_id
-            WHERE
-                 a.stream_measure >= b.stream_measure and 
-                 b.spec_code is not null
-        ), 
-        unqvalues as (
-            SELECT id, array_agg(spec_code) as spec from edgespecies group by id
-        )
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-        SET species_upstr = species_upstr || spec
-        FROM unqvalues where unqvalues.id = {dbTargetSchema}.{dbCrossingsTable}.id; 
-
-
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-            SET species_upstr = ARRAY(SELECT DISTINCT UNNEST(species_upstr) order by 1); 
-            
-            
-        --populate species_downstr
-        
-        UPDATE {dbTargetSchema}.{dbCrossingsTable} set species_downstr = a.fish_survey_down
-        FROM {dbTargetSchema}.{dbTargetStreamTable} a
-        WHERE a.id = {dbTargetSchema}.{dbCrossingsTable}.stream_id;
-        
-        --add species observation on the same edge as the stream
-        --with a stream measure is less than crossing measure 
-        with edgespecies as (
-            SELECT distinct  a.id, b.spec_code 
-            FROM 
-                {dbTargetSchema}.{dbCrossingsTable} a join 
-                {dbTargetSchema}.{appconfig.config['DATABASE']['fish_survey_table']} b on a.stream_id = b.stream_id
-            WHERE
-                 a.stream_measure <= b.stream_measure and 
-                 b.spec_code is not null
-        ), 
-        unqvalues as (
-            SELECT id, array_agg(spec_code) as spec from edgespecies group by id
-        )
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-        SET species_downstr = species_downstr || spec
-        FROM unqvalues where unqvalues.id = {dbTargetSchema}.{dbCrossingsTable}.id; 
-
-
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-            SET species_downstr = ARRAY(SELECT DISTINCT UNNEST(species_downstr) order by 1); 
-            
-            
-            
-        --populate stock_upstr
-        
-        UPDATE {dbTargetSchema}.{dbCrossingsTable} set stock_upstr =
-        a.fish_stock_up
-        FROM {dbTargetSchema}.{dbTargetStreamTable} a
-        WHERE a.id = {dbTargetSchema}.{dbCrossingsTable}.stream_id;
-        
-        --add species observation on the same edge as the stream
-        --with a stream measure is greater than crossing measure 
-        with edgespecies as (
-            SELECT distinct  a.id, b.spec_code 
-            FROM 
-                {dbTargetSchema}.{dbCrossingsTable} a join 
-                {dbTargetSchema}.{appconfig.config['DATABASE']['fish_stocking_table']} b on a.stream_id = b.stream_id
-            WHERE
-                 a.stream_measure >= b.stream_measure and 
-                 b.spec_code is not null
-        ), 
-        unqvalues as (
-            SELECT id, array_agg(spec_code) as spec from edgespecies group by id
-        )
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-        SET stock_upstr = stock_upstr || spec
-        FROM unqvalues where unqvalues.id = {dbTargetSchema}.{dbCrossingsTable}.id; 
-
-
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-            SET stock_upstr = ARRAY(SELECT DISTINCT UNNEST(stock_upstr) order by 1); 
-            
-            
-        --populate species_downstr
-        
-        UPDATE {dbTargetSchema}.{dbCrossingsTable} set stock_downstr = a.fish_stock_down
-        FROM {dbTargetSchema}.{dbTargetStreamTable} a
-        WHERE a.id = {dbTargetSchema}.{dbCrossingsTable}.stream_id;
-        
-        --add species observation on the same edge as the stream
-        --with a stream measure is less than crossing measure 
-        with edgespecies as (
-            SELECT distinct  a.id, b.spec_code 
-            FROM 
-                {dbTargetSchema}.{dbCrossingsTable} a join 
-                {dbTargetSchema}.{appconfig.config['DATABASE']['fish_stocking_table']} b on a.stream_id = b.stream_id
-            WHERE
-                 a.stream_measure <= b.stream_measure and 
-                 b.spec_code is not null
-        ), 
-        unqvalues as (
-            SELECT id, array_agg(spec_code) as spec from edgespecies group by id
-        )
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-        SET stock_downstr = stock_downstr || spec
-        FROM unqvalues where unqvalues.id = {dbTargetSchema}.{dbCrossingsTable}.id; 
-
-
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-            SET stock_downstr = ARRAY(SELECT DISTINCT UNNEST(stock_downstr) order by 1); 
-        
-        
-        --populate barrier fields - note the stream network is broken at barrier
-        --points so we don't have to worry about stream measure issues like we do
-        --with the stocking/survey points
-        UPDATE {dbTargetSchema}.{dbCrossingsTable} SET 
-            barriers_upstr = a.barriers_up,
-            barriers_downstr = a.barriers_down,
-            barrier_cnt_upstr = a.barrier_up_cnt,
-            barrier_cnt_downstr = a.barrier_down_cnt
-        FROM {dbTargetSchema}.{dbTargetStreamTable} a
-        WHERE a.id = {dbTargetSchema}.{dbCrossingsTable}.stream_id;
     """
     #print(query)
     with connection.cursor() as cursor:
         cursor.execute(query)
-                        
-#--- main program ---    
-with appconfig.connectdb() as conn:
-    
-    conn.autocommit = False
-    
-    print("Computing Modelled Crossings")
-    
-    print("  creating tables")
-    createTable(conn)
-    
-    print("  computing modelled crossings")
-    computeCrossings(conn)
-    
-print("done")
 
+def computeAttributes(connection):
+    
+    #assign all modelled crossings on 5th order streams and above a 
+    #crossing_subtype of 'bridge' and a passability_status of 'passable'
+    #https://github.com/egouge/cwf-alberta/issues/1
+    
+    query = f"""
+        
+        UPDATE {dbTargetSchema}.{dbCrossingsTable}
+        SET crossing_subtype = 'bridge',
+          passability_status = 'PASSABLE'
+        WHERE strahler_order >= {orderBarrierLimit};
+    """
+    #print(query)
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+    
+    
+def addToBarriers(connection):
+        
+    query = f"""
+        
+        INSERT INTO {dbTargetSchema}.{dbBarrierTable}
+          (cabd_id, original_point, snapped_point, name, type)
+        SELECT null, geometry, geometry, null, 'modelled_crossing'
+        FROM {dbTargetSchema}.{dbCrossingsTable}
+        WHERE strahler_order < {orderBarrierLimit};
+        
+    """
+    #print(query)
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+
+def main():                        
+    #--- main program ---    
+    with appconfig.connectdb() as conn:
+        
+        conn.autocommit = False
+        
+        print("Computing Modelled Crossings")
+        
+        print("  creating tables")
+        createTable(conn)
+        
+        print("  computing modelled crossings")
+        computeCrossings(conn)
+
+        print("  add to barriers ")
+        addToBarriers(conn)
+        
+        print("  calculating modelled crossing attributes ")
+        computeAttributes(conn)
+                
+    print("done")
+
+if __name__ == "__main__":
+    main() 

@@ -339,23 +339,28 @@ def findElevation(x, y):
     return appconfig.NODATA    
 
 #--- main program ---
-with appconfig.connectdb() as conn:
+def main():
     
-    prepareOutput(conn);
-
-    demfiles = indexDem()
+    with appconfig.connectdb() as conn:
+        
+        prepareOutput(conn);
     
-    #process each dem file
-    print("Computing Elevations")
-    for demfile in demfiles:
-        processArea(demfile, conn)
-
-    #search for any missing coordinates that may require 
-    #multiple dem files to compute
-    #if we have one giant dem file then ignore this
-    if (len(demfiles) > 1):
-        print ("  computing overlap areas")
+        demfiles = indexDem()
+        
+        #process each dem file
+        print("Computing Elevations")
         for demfile in demfiles:
-            processArea(demfile, conn, True)
+            processArea(demfile, conn)
+    
+        #search for any missing coordinates that may require 
+        #multiple dem files to compute
+        #if we have one giant dem file then ignore this
+        if (len(demfiles) > 1):
+            print ("  computing overlap areas")
+            for demfile in demfiles:
+                processArea(demfile, conn, True)
 
-print("done")
+    print("done")
+
+if __name__ == "__main__":
+    main()     
