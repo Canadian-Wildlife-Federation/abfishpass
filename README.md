@@ -33,42 +33,6 @@ All of the scripts allow for a custom configuration file to be specified by prov
 
 > prompt> create_db.py custom_config.ini
 
-**Settings**
-
-* [OGR]:org -> location of OGR2OGR program
-* [OGR]:gdalinfo -> location of gdalinfo program
-* [OGR]:gdalsrsinfo -> location of gdalsrsinfo program
-* [OGR]:proj -> OPTIONAL only required if multiple versions of proj are installed 
-* [DATABASE]:host -> database hostname
-* [DATABASE]:port -> database port
-* [DATABASE]:name -> database name
-* [DATABASE]:user -> database user
-* [DATABASE]:password -> database password
-* [DATABASE]:data_schema -> the main data schema to store raw source data
-* [DATABASE]:stream_table -> the name of the raw streams source data
-* [DATABASE]:working_srid -> the srid of the source data
-* [CABD_DATABASE]:host -> CABD database hostname for loading barriers
-* [CABD_DATABASE]:port -> CABD database port for loading barriers
-* [CABD_DATABASE]:name -> CABD database name for loading barriers
-* [CABD_DATABASE]:user -> CABD database username for loading barriers
-* [CABD_DATABASE]:password -> CABD database password for loading barriers
-* [CREATE_LOAD_SCRIPT]:raw_data -> link to the source data file
-* [CREATE_LOAD_SCRIPT]:road_table -> the database table name to load roads data into
-* [CREATE_LOAD_SCRIPT]:rail_table -> the database table name to load rail data into
-* [CREATE_LOAD_SCRIPT]:trail_table -> the database table name to load trails data into
-* [PROCESSING]:watershed_id -> the watershed id to process
-* [PROCESSING]:output_schema -> the database schema to write processing results to
-* [PROCESSING]:stream_table -> the main stream tables containing all the streams data for the watershed and computed outputs
-* [ELEVATION_PROCESSING]:dem_directory -> location of dem files
-* [ELEVATION_PROCESSING]:target_3dgeometry_field -> field name to write raw z geometries to
-* [ELEVATION_PROCESSING]:target_smoothedgeometry_field -> field name to write smoothed z geometries to
-* [MAINSTEM_PROCESSING]:mainstem_id -> mainstem id field name
-* [ELEVATION_PROCESSING]:downstream_route_measure  -> field name to downstream route measure to
-* [ELEVATION_PROCESSING]:upstream_route_measure  -> field name to write upstream route measure to
-* [GRADIENT_PROCESSING]: vertex_gradient_table -> table to store vertex gradient data
-* [GRADIENT_PROCESSING]: segment_gradient_field -> field name to write segment gradient value to    
-* [BARRIER_PROCESSING]: barrier_table -> name of table to load barrier data into
-
 ## 1 - Loading Data
 
 The first step is to populate the database with the required data. These load scripts are specific to the data provided for Alberta. Different source data will require modifications to these scripts.
@@ -95,7 +59,7 @@ Currently processing includes:
 * Computing an elevation values for all stream segments
 * Computing a smoothed elevation value for all stream segments
 * Compute gradient for each stream vertex based on vertex elevation and elevation 100m upstream.
-* Break stream segments at "barriers" and "gradient barriers"
+* Break stream segments at required locations
 * Reassign raw elevation, smoothed elevation to stream segments
 * Compute segment gradient based on start, end elevation and length
 * Load and snap fish stocking and observation data to stream network
@@ -104,7 +68,7 @@ Currently processing includes:
 * Compute habitat models
 * Compute upstream/downstream statistics for modelled crossings
 
-
+---
 **Main Script**
 
 process_watershed.py
@@ -119,9 +83,10 @@ process_watershed.py
 * A new schema with a streams table, barrier, modelled crossings and other output tables.
 **ALL EXISTING DATA IN THE OUTPUT TABLES WILL BE DELETED**
  
-
+---
 ### 2 - Individual Processing Scripts
 
+---
 #### 2A - PreProcessing
 
 This script creates required database schemas, and loads stream data for the watershed into a working table in this schema.
@@ -140,7 +105,7 @@ preprocess_watershed.py
 * A database schema named after the watershed id
 * A streams table in this schema populated with all streams from the raw dataset
 
-
+---
 #### 2B - Loading Barriers
 This script loads waterfalls and dam barriers from the CABD database.
 
@@ -159,7 +124,7 @@ load_and_snap_barriers_cabd.py
 * A new barrier table populated with dam and waterfall barriers from the CABD database
 * The barrier table has two geometry fields - the raw field and a snapped field (the geometry snapped to the stream network). The maximum snapping distance is specified in the configuration file.
 
-
+---
 #### 2C - Compute Modelled Crossings
 This script computes modelled crossings defined as locations where rail, road, or trails cross stream networks (based on feature geometries). Due to mapping errors these crossing may not actually exist on the ground.
 
@@ -179,9 +144,8 @@ load_modelled_corssings.py
 *M odelled crossings with strahler_order >= 5 are classified as sub_type of bridge and a passability status of PASSABLE
 * Updated barriers table that now includes modelled crossing that occur on streams with strahler order < 5
  
-
+---
 #### 2D - Mainstems
-
 
 Computes mainstems based on names of streams and longest upstream length.
 
@@ -198,7 +162,7 @@ compute_mainstems.py
 * A new field, mainstem_id, downstream_route_measure and upstream_route_measure, added to the input table. At this point the measure fields are calculated in m
 
 
-
+---
 #### 2E - Assign Raw Z Value
 
 Drapes a stream network over provided DEMs and computes a rawz value for each vertex in the stream network.
@@ -216,7 +180,8 @@ assign_raw_z.py
 
 * A geometry_raw3d field added to the stream table that represents the 3d geometry for the segment
 
-#### 2E - Compute Smoothed Z Value
+---
+#### 2F - Compute Smoothed Z Value
 
 Takes a set of stream edges with raw z values and smoothes them so that the streams are always flowing down hill.
 
@@ -232,7 +197,8 @@ smooth_z.py
 
 * A new field, geometry_smoothed3d, added to the input table
 
-#### 2F - Compute Vertex Gradients
+---
+#### 2G - Compute Vertex Gradients
 
 For every stream vertex, this scripts takes the elevation at that point and the elevation along the mainstem at a point 100m upstream and computes the gradient based on those two elevations 
 
@@ -248,10 +214,10 @@ compute_vertex_gradient.py
 
 * A new table (vertex_gradients) with a single point for every vertex with a gradient calculated. This table includes both the vertex geometry, upstream geometry and elevation values at both those locations
 
+---
+#### 2H - Break Streams
 
-#### 2G - Break Streams
-
-This script breaks the stream network at barriers and recomputes necessary attributes. 
+This script breaks the stream network at "barriers" and recomputes necessary attributes. 
 
 For this script a barrier is considered to be: a cabd barrier (dam, waterfall), all modelled crossings, and the most downstream verticies with a gradient greater than minimum value specified in the fish_species table for the accessasbility_gradient field in a collection of verticies with gradient values larger than this value.
 
@@ -283,14 +249,15 @@ break_streams_at_barriers.py
 * updated streams table with mainstem route measures recomputed (in km this time)
 * updated modelled crossings table (stream_id is replaces with a stream_id_up and stream_id_down referencing the upstream and downstream edges linked to the point)
   
-
-#### 2H - ReAssign Raw Z Value
+---
+#### 2I - ReAssign Raw Z Value
 We recompute z values again based on the raw data so any added verticies and be computed based on the raw data and not interpolated points.
- 
-#### 2I - ReCompute Smoothed Z Value
 
+---
+#### 2J - ReCompute Smoothed Z Value
 
-#### 2J - Compute Segment Gradient
+---
+#### 2K - Compute Segment Gradient
 
 Compute a segment gradient based on the smoothed elevation for the most upstream coordinate, most downstreamm coordinate, and the length of the stream segment
 
@@ -307,8 +274,8 @@ compute_segment_gradient.py
 * addition of segment_elevation to streams table
 
 
-
-#### 2K - Load and snap file observations
+---
+#### 2L - Load and snap file observations
 
 Loads fish observation data provided and snaps it to the stream network. 
 
@@ -325,8 +292,8 @@ load_and_snap_fishobservations.py
 
 * addition of three tables: fish_aquatic_habitat, fish_stocking, and fish_survey
 
-
-#### 2L - Compute upstream and downstream barrier and fish species information.
+---
+#### 2M - Compute upstream and downstream barrier and fish species information.
 
 Computes a number of statistics for each stream segment:
 * number of upstream and downstream barriers
@@ -347,8 +314,8 @@ compute_updown_barriers_fish.py
 **Output**
 * addition of statistic fields to stream network table
 
-
-#### 2M - Compute gradient accessibility models
+---
+#### 2N - Compute gradient accessibility models
 
 Computes an accessibility value for each fish species for each stream segment based on:
 * segment gradient
@@ -377,8 +344,8 @@ compute_gradient_accessbility.py
 
 * addition of an accessibility field to stream network table for each fish species 
 
-
-#### 2N - Compute habitat models
+---
+#### 2O - Compute habitat models
 
 Computes a true/false value for the following habitat models for each stream segment.
 
@@ -401,8 +368,8 @@ compute_habitat_models.py
 * addition of an habitat model fields to stream network table for each fish species
 
 
-
-#### 2N - Compute modelled crossing statistics 
+---
+#### 2P - Compute modelled crossing statistics 
 
 Computes a collection of modelled crossing statistics for each species and habitat model including:
  * total accessible upstream length - total length of streams that are accessible upstream of this point  
@@ -418,7 +385,7 @@ Computes a collection of modelled crossing statistics for each species and habit
 * addition of an statistic fields to to the modelled crossings table
 
 
-
+---
 ## Algorithms 
 ### Draping Algorithm
 
@@ -508,3 +475,70 @@ Mainstems are computed by starting at the sink node and walking up the network. 
 2) if no edges have the same name then any named edge; if there are multiple named edges it picks the edge with the longest path to a headwater
 3) if no named edges; then it  picks the edge with the longest path to a headwater.
 
+
+
+---
+## Configuration File
+
+[OGR]  
+ogr = location of ogr2ogr  executable  
+gdalinfo = location of gdalinfo executable  
+gdalsrsinfo = location of gdalsrsinfo executable   
+proj = *optional* location of proj library  
+  
+[DATABASE]  
+host = database host  
+port = database post  
+name = database name  
+user = database username  
+password = database password  
+data_schema = name of main schema for holding raw stream data  
+stream_table = names of streams table  
+fish_species_table = name of fish species table  
+working_srid = the srid (3400) of the stream data - these scripts use the function st_length to compute stream length so the raw data should be in a meters based projection (or reprojected before used)  
+aquatic_habitat_table = table name for fish aquatic habitat data  
+fish_stocking_table = table name for fish stocking data  
+fish_survey_table = table name for fish survey data  
+  
+[CABD_DATABASE] - the barriers database for loading barrier data  
+host = CABD host name  
+port = CABD port  
+name = CABD database name  
+user = CABD username  
+password = CABD password  
+buffer = this is the buffer distance to grab features - the units are in the working_srid so if its meters 200 is reasonable, if it's degrees something like 0.001 is reasonable  
+snap_distance = distance (in working srid units) for snapping point features #to the stream network (fish observation data, barrier data etc)  
+  
+[CREATE_LOAD_SCRIPT]  
+raw_data = raw alberta data  
+road_table = road table name  
+rail_table = rail table name  
+trail_table = trail table name  
+  
+[PROCESSING]  
+stream_table = stream table name  
+watershed_id = watershed id to process  
+output_schema = output schema name  
+fish_observation_data = zip file containing fish observation data  
+  
+[ELEVATION_PROCESSING]  
+dem_directory = directory containing dem   
+3dgeometry_field = field name (in streams table) for geometry that stores raw elevation data  
+smoothedgeometry_field = field name (in streams table)  for geometry that stores smoothed elevation data  
+  
+[MAINSTEM_PROCESSING]  
+mainstem_id = name of mainstem id field (in streams table)  
+downstream_route_measure = name of downstream route measure field  
+upstream_route_measure =name  upstream route measure field  
+  
+[GRADIENT_PROCESSING]  
+vertex_gradient_table = table for storing vertex gradient values   
+segment_gradient_field = name of segment gradient field (in streams table)  
+max_downstream_graident_field = name of field for storing the maximum downstream segment gradient (in streams table)  
+  
+[BARRIER_PROCESSING]  
+barrier_table = table for storing barriers  
+  
+[MODELLED_CROSSINGS]  
+modelled_crossings_table = table for storing modelled crossings  
+strahler_order_barrier_limit = all crossings on streams with strahler order less than this will be considered barriers and treated similar to dams/waterfalls for habitat modelling  
