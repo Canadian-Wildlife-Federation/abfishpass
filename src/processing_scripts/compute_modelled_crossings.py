@@ -190,19 +190,16 @@ def computeAttributes(connection):
     with connection.cursor() as cursor:
         cursor.execute(query)
     
-    
 def addToBarriers(connection):
         
     query = f"""
-        
         INSERT INTO {dbTargetSchema}.{dbBarrierTable}
           (cabd_id, original_point, snapped_point, name, type)
         SELECT null, geometry, geometry, null, 'modelled_crossing'
         FROM {dbTargetSchema}.{dbCrossingsTable}
-        WHERE passability_status = 'PASSABLE'
-        
+        WHERE passability_status = 'PASSABLE';
     """
-    #print(query)
+    print(query)
     with connection.cursor() as cursor:
         cursor.execute(query)
 
@@ -220,11 +217,14 @@ def main():
         print("  computing modelled crossings")
         computeCrossings(conn)
 
-        print("  add to barriers ")
-        addToBarriers(conn)
         
         print("  calculating modelled crossing attributes ")
         computeAttributes(conn)
+        
+        print("  add to barriers ")
+        addToBarriers(conn)
+        
+        conn.commit()
                 
     print("done")
 
