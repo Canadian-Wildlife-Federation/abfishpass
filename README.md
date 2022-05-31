@@ -298,7 +298,9 @@ load_and_snap_fishobservations.py
 Computes a number of statistics for each stream segment:
 * number of upstream and downstream barriers
 * the identifiers of the upstream and downstream barriers
+* the fish species stocked (on the stream)
 * the fish species which are stocked upstream and downstream 
+* the fish species surveyed (on the stream)
 * the fish species which were surveyed upstream and downstream
 
 **Script**
@@ -321,9 +323,10 @@ Computes an accessibility value for each fish species for each stream segment ba
 * segment gradient
 * maximum accessibility gradient (specified in the fish_species table)
 * barrier location
+* fish survey and stocking information 
 
 Segments are classified as:
-* ACCESSIBILE - when all gradients downstream are less than maximum amount and there are no barriers downstream
+* ACCESSIBILE - when all gradients downstream are less than maximum amount and there are no barriers downstream OR there is fish stocking or fish survey points upstream (for the given species)
 * POTENTIAL ACCESSIBLE - when all gradients downstream are less than the maximum amount but there is a barrier downstream
 * NOT ACCESSIBLE - when any downstream gradient is greater than the maximum value
 

@@ -34,6 +34,8 @@ dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 dbModelledCrossingsTable = appconfig.config['MODELLED_CROSSINGS']['modelled_crossings_table']
 
+dbFishStockingTable = appconfig.config['DATABASE']['fish_stocking_table']
+dbFishSurveyTable = appconfig.config['DATABASE']['fish_survey_table']
 
 edges = []
 nodes = dict()
@@ -150,7 +152,7 @@ def createNetwork(connection):
     #add species and stocking details
     query = f"""
         select a.stream_id, a.spec_code
-        FROM {dbTargetSchema}.fish_stocking a
+        FROM {dbTargetSchema}.{dbFishStockingTable} a
         WHERE spec_code IS NOT NULL
     """ 
     
@@ -169,7 +171,7 @@ def createNetwork(connection):
     
     query = f"""
         select a.stream_id, a.spec_code
-        FROM {dbTargetSchema}.fish_survey a
+        FROM {dbTargetSchema}.{dbFishSurveyTable} a
         WHERE spec_code IS NOT NULL
     """
    
@@ -348,11 +350,43 @@ def main():
             ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_up varchar[];
             ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_down varchar[];
             
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_stock varchar[];
             ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_stock_up varchar[];
             ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_stock_down varchar[];
             
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_survey varchar[];
             ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_survey_up varchar[];
             ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_survey_down varchar[];
+            
+            WITH fishcodes AS (
+                SELECT stream_id, array_agg(spec_code) as spec
+                FROM 
+                (
+                    SELECT distinct stream_id, spec_code
+                    FROM {dbTargetSchema}.{dbFishStockingTable}
+                    WHERE spec_code is not null
+                ) foo
+                GROUP BY stream_id
+            )
+            UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+            SET fish_stock = fishcodes.spec
+            FROM fishcodes 
+            WHERE fishcodes.stream_id = {dbTargetSchema}.{dbTargetStreamTable}.id   ;
+            
+            WITH fishcodes AS (
+                SELECT stream_id, array_agg(spec_code) as spec
+                FROM 
+                (
+                    SELECT distinct stream_id, spec_code
+                    FROM {dbTargetSchema}.{dbFishSurveyTable}
+                    WHERE spec_code is not null
+                ) foo
+                GROUP BY stream_id
+            )
+            UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+            SET fish_survey = fishcodes.spec
+            FROM fishcodes 
+            WHERE fishcodes.stream_id = {dbTargetSchema}.{dbTargetStreamTable}.id;
         """
         
         with conn.cursor() as cursor:

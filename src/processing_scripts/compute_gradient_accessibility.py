@@ -166,7 +166,7 @@ def writeResults(connection):
 def computeAccessibility(connection):
         
     query = f"""
-        SELECT code, name, accessibility_gradient
+        SELECT code, name, accessibility_gradient, allcodes
         FROM {dataSchema}.{appconfig.fishSpeciesTable};
     """
     
@@ -179,6 +179,13 @@ def computeAccessibility(connection):
             name = feature[1]
             maxvalue = feature[2]
             
+            allcodes = feature[3]
+            
+            fishop = ""
+            for fcode in allcodes:
+                fishop = fishop + "upper('" + fcode + "') like ANY (fish_stock || fish_survey || fish_stock_up || fish_survey_up) or " 
+                
+                
             print("  processing " + name)
             
             query = f"""
@@ -189,9 +196,11 @@ def computeAccessibility(connection):
                 
                 UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
                 set {code}_accessibility = 
-                CASE WHEN {dbMaxDownGradientField} < {maxvalue} and barrier_down_cnt = 0 THEN '{appconfig.Accessibility.ACCESSIBLE.value}'
-                    WHEN {dbMaxDownGradientField} < {maxvalue} and barrier_down_cnt > 0 THEN '{appconfig.Accessibility.POTENTIAL.value}'
-                    ELSE '{appconfig.Accessibility.NOT.value}' END;
+                CASE 
+                  WHEN {fishop} ({dbMaxDownGradientField} < {maxvalue} and barrier_down_cnt = 0) THEN '{appconfig.Accessibility.ACCESSIBLE.value}'
+                  WHEN {dbMaxDownGradientField} < {maxvalue} and barrier_down_cnt > 0 THEN '{appconfig.Accessibility.POTENTIAL.value}'
+                  ELSE '{appconfig.Accessibility.NOT.value}' END;
+                
             """
             with connection.cursor() as cursor2:
                 cursor2.execute(query)

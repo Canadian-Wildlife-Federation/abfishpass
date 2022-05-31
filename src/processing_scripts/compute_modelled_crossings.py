@@ -193,7 +193,7 @@ def addToBarriers(connection):
           (cabd_id, original_point, snapped_point, name, type)
         SELECT null, geometry, geometry, null, 'modelled_crossing'
         FROM {dbTargetSchema}.{dbCrossingsTable}
-        WHERE strahler_order < {orderBarrierLimit};
+        WHERE passability_status = 'PASSABLE'
         
     """
     #print(query)
