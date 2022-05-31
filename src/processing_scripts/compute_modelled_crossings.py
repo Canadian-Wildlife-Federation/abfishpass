@@ -179,6 +179,12 @@ def computeAttributes(connection):
         SET crossing_subtype = 'bridge',
           passability_status = 'PASSABLE'
         WHERE strahler_order >= {orderBarrierLimit};
+        
+        --set everything else to barrier for now
+        UPDATE {dbTargetSchema}.{dbCrossingsTable}
+        SET 
+          passability_status = 'BARRIER'
+        WHERE passability_status is null; 
     """
     #print(query)
     with connection.cursor() as cursor:
