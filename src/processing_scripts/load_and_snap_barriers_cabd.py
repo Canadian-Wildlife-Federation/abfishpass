@@ -24,9 +24,12 @@ import appconfig
 import psycopg2 as pg2
 import psycopg2.extras
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
+iniSection = appconfig.args.args[0]
+
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
-workingWatershedId = appconfig.config['PROCESSING']['watershed_id']
+workingWatershedId = appconfig.config[iniSection]['watershed_id']
+
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
 

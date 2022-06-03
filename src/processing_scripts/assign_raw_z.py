@@ -31,11 +31,11 @@ from math import floor
 import json
 import psycopg2.extras
 
-
-watershed_id = appconfig.config['PROCESSING']['watershed_id']
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
-
+iniSection = appconfig.args.args[0]
+watershed_id = appconfig.config[iniSection]['watershed_id']
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
 dbTargetTable = appconfig.config['PROCESSING']['stream_table']
+
 dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['3dgeometry_field']
 demDir = appconfig.config['ELEVATION_PROCESSING']['dem_directory'];
 

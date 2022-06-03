@@ -23,7 +23,9 @@
 #
 import appconfig
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
+iniSection = appconfig.args.args[0]
+
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbCrossingsTable = appconfig.config['MODELLED_CROSSINGS']['modelled_crossings_table']
@@ -197,9 +199,9 @@ def addToBarriers(connection):
           (cabd_id, original_point, snapped_point, name, type)
         SELECT null, geometry, geometry, null, 'modelled_crossing'
         FROM {dbTargetSchema}.{dbCrossingsTable}
-        WHERE passability_status = 'PASSABLE';
+        WHERE passability_status = 'BARRIER';
     """
-    print(query)
+    #print(query)
     with connection.cursor() as cursor:
         cursor.execute(query)
 

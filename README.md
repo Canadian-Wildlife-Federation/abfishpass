@@ -14,7 +14,7 @@ Copyright 2022 by Canadian Wildlife Federation, Alberta Environment and Parks
 Apache License, Version 2.0
 http://www.apache.org/licenses/LICENSE-2.0
 
-## Software Requirements
+# Software Requirements
 * Python (tested with version 3.9.5)
     * Modules: shapely, psycopg2, tifffile
     
@@ -26,14 +26,20 @@ http://www.apache.org/licenses/LICENSE-2.0
 
 
 
-## Configuration
-All configuration is setup in the config.ini file. Before running any scripts you should ensure the information in this file is correct.
+# Configuration
+All configuration is setup in the config.ini file. Before running any scripts you should ensure the information in this file is correct. 
 
-All of the scripts allow for a custom configuration file to be specified by providing it as the first argument to the program. If not supplied the default config.ini file will be used. For example:
+All of the scripts allow for a custom configuration file to be specified by providing it as the -c argument to the program. If not supplied the default config.ini file will be used. For example:
 
-> prompt> create_db.py custom_config.ini
+> prompt> create_db.py -c custom_config.ini
 
-## 1 - Loading Data
+
+# Processing
+
+Data Processing takes part in three steps: load raw data, processes each watershed, compute summary statistics.
+
+
+## 1 - Loading RAW Data
 
 The first step is to populate the database with the required data. These load scripts are specific to the data provided for Alberta. Different source data will require modifications to these scripts.
 
@@ -49,7 +55,7 @@ Note: Currently there is no velocity or channel confinement data. These paramete
 
 ## 2 - Watershed Processing
 
-Processing is completed by watershed id. When processing a watershed all processed data is written to a schema in the database named after the watershed identifier.
+Processing is completed by watershed id, each watershed is processed into a separate schema in the database. The watershed configuration must be specified in the ini file and the configuration to be used provided to the script (see below).
 
 Currently processing includes:
 * Preprocessing step which loads all the streams from the raw datastore into the working schema
@@ -68,10 +74,17 @@ Currently processing includes:
 * Compute habitat models
 * Compute upstream/downstream statistics for modelled crossings
 
----
 **Main Script**
 
-process_watershed.py
+process_watershed.py -c config.ini <watershedid>
+
+The watershedid field must be specified as a section header in the config.ini file. The section must describe the watershed processing details for example:
+
+[17010301]
+#Berland: 17010301
+watershed_id = 17010301
+output_schema = ws17010301
+fish_observation_data = C:\temp\fishobservationdata.zip
 
 **Input Requirements**
 
@@ -82,12 +95,33 @@ process_watershed.py
 
 * A new schema with a streams table, barrier, modelled crossings and other output tables.
 **ALL EXISTING DATA IN THE OUTPUT TABLES WILL BE DELETED**
+
+
+## 3 - Compute Summary Statistics
+
+Summary statistic are computed across multiple watersheds (specific in the config.ini).  
+
+**Main Script**
+
+compute_watershed_stats.py
+
+**Input Requirements**
+
+* This scripts reads fields from the processed watershed data in the various schemas.   
+
+**Output**
+
+* A new table hydro.habitat_stats that contains various watershed statistics
+
+
  
 ---
-### 2 - Individual Processing Scripts
+#  Individual Processing Scripts
+
+These scripts are the individual processing scripts that are used for the watershed processing steps.
 
 ---
-#### 2A - PreProcessing
+#### 1 - PreProcessing
 
 This script creates required database schemas, and loads stream data for the watershed into a working table in this schema.
 
@@ -106,7 +140,7 @@ preprocess_watershed.py
 * A streams table in this schema populated with all streams from the raw dataset
 
 ---
-#### 2B - Loading Barriers
+#### 2 - Loading Barriers
 This script loads waterfalls and dam barriers from the CABD database.
 
 
@@ -125,7 +159,7 @@ load_and_snap_barriers_cabd.py
 * The barrier table has two geometry fields - the raw field and a snapped field (the geometry snapped to the stream network). The maximum snapping distance is specified in the configuration file.
 
 ---
-#### 2C - Compute Modelled Crossings
+#### 3 - Compute Modelled Crossings
 This script computes modelled crossings defined as locations where rail, road, or trails cross stream networks (based on feature geometries). Due to mapping errors these crossing may not actually exist on the ground.
 
 
@@ -145,7 +179,7 @@ load_modelled_corssings.py
 * Updated barriers table that now includes modelled crossing that occur on streams with strahler order < 5
  
 ---
-#### 2D - Mainstems
+#### 4 - Mainstems
 
 Computes mainstems based on names of streams and longest upstream length.
 
@@ -163,7 +197,7 @@ compute_mainstems.py
 
 
 ---
-#### 2E - Assign Raw Z Value
+#### 5 - Assign Raw Z Value
 
 Drapes a stream network over provided DEMs and computes a rawz value for each vertex in the stream network.
 
@@ -181,7 +215,7 @@ assign_raw_z.py
 * A geometry_raw3d field added to the stream table that represents the 3d geometry for the segment
 
 ---
-#### 2F - Compute Smoothed Z Value
+#### 6 - Compute Smoothed Z Value
 
 Takes a set of stream edges with raw z values and smoothes them so that the streams are always flowing down hill.
 
@@ -198,7 +232,7 @@ smooth_z.py
 * A new field, geometry_smoothed3d, added to the input table
 
 ---
-#### 2G - Compute Vertex Gradients
+#### 7 - Compute Vertex Gradients
 
 For every stream vertex, this scripts takes the elevation at that point and the elevation along the mainstem at a point 100m upstream and computes the gradient based on those two elevations 
 
@@ -215,7 +249,7 @@ compute_vertex_gradient.py
 * A new table (vertex_gradients) with a single point for every vertex with a gradient calculated. This table includes both the vertex geometry, upstream geometry and elevation values at both those locations
 
 ---
-#### 2H - Break Streams
+#### 8 - Break Streams
 
 This script breaks the stream network at "barriers" and recomputes necessary attributes. 
 
@@ -250,14 +284,14 @@ break_streams_at_barriers.py
 * updated modelled crossings table (stream_id is replaces with a stream_id_up and stream_id_down referencing the upstream and downstream edges linked to the point)
   
 ---
-#### 2I - ReAssign Raw Z Value
+#### 9 - ReAssign Raw Z Value
 We recompute z values again based on the raw data so any added verticies and be computed based on the raw data and not interpolated points.
 
 ---
-#### 2J - ReCompute Smoothed Z Value
+#### 10 - ReCompute Smoothed Z Value
 
 ---
-#### 2K - Compute Segment Gradient
+#### 11 - Compute Segment Gradient
 
 Compute a segment gradient based on the smoothed elevation for the most upstream coordinate, most downstreamm coordinate, and the length of the stream segment
 
@@ -275,7 +309,7 @@ compute_segment_gradient.py
 
 
 ---
-#### 2L - Load and snap file observations
+#### 12 - Load and snap file observations
 
 Loads fish observation data provided and snaps it to the stream network. 
 
@@ -293,7 +327,7 @@ load_and_snap_fishobservations.py
 * addition of three tables: fish_aquatic_habitat, fish_stocking, and fish_survey
 
 ---
-#### 2M - Compute upstream and downstream barrier and fish species information.
+#### 13 - Compute upstream and downstream barrier and fish species information.
 
 Computes a number of statistics for each stream segment:
 * number of upstream and downstream barriers
@@ -317,7 +351,7 @@ compute_updown_barriers_fish.py
 * addition of statistic fields to stream network table
 
 ---
-#### 2N - Compute gradient accessibility models
+#### 14 - Compute gradient accessibility models
 
 Computes an accessibility value for each fish species for each stream segment based on:
 * segment gradient
@@ -348,7 +382,7 @@ compute_gradient_accessbility.py
 * addition of an accessibility field to stream network table for each fish species 
 
 ---
-#### 2O - Compute habitat models
+#### 15 - Compute habitat models
 
 Computes a true/false value for the following habitat models for each stream segment.
 
@@ -372,7 +406,7 @@ compute_habitat_models.py
 
 
 ---
-#### 2P - Compute modelled crossing statistics 
+#### 16 - Compute modelled crossing statistics 
 
 Computes a collection of modelled crossing statistics for each species and habitat model including:
  * total accessible upstream length - total length of streams that are accessible upstream of this point  
@@ -388,9 +422,9 @@ Computes a collection of modelled crossing statistics for each species and habit
 * addition of an statistic fields to to the modelled crossings table
 
 
----
-## Algorithms 
-### Draping Algorithm
+
+# Algorithms 
+## Draping Algorithm
 
 To compute raw elevation, for each vertex:
 
@@ -426,7 +460,11 @@ Vz = ((y2 - y) / (y2 - y1))*fxy1 + ((y - y1)/(y2 - y1))*fxy2
 
 Notes: we assume that the elevation values provided in the DEM represent the elevation at the center point of the cell    
 
-### Smoothing Algorithm
+
+
+
+
+## Smoothing Algorithm
 
 The smoothing process ensures streams always flow down hill.
 
@@ -471,7 +509,7 @@ Notes:
 
 
 
-### Mainstem Algorithm
+## Mainstem Algorithm
 
 Mainstems are computed by starting at the sink node and walking up the network. At any confluence the mainsteam is push up the edge that:
 1) has the same stream name as the current edge
@@ -479,9 +517,8 @@ Mainstems are computed by starting at the sink node and walking up the network. 
 3) if no named edges; then it  picks the edge with the longest path to a headwater.
 
 
-
 ---
-## Configuration File
+# Configuration File
 
 [OGR]  
 ogr = location of ogr2ogr  executable  
@@ -519,7 +556,14 @@ rail_table = rail table name
 trail_table = trail table name  
   
 [PROCESSING]  
-stream_table = stream table name  
+stream_table = stream table name 
+
+[WATERSHEDID 1] -> there will be one section for each watershed with a unique section name  
+watershed_id = watershed id to process  
+output_schema = output schema name  
+fish_observation_data = zip file containing fish observation data  
+
+[WATERSHEDID 2] -> there will be one section for each watershed with a unique section name  
 watershed_id = watershed id to process  
 output_schema = output schema name  
 fish_observation_data = zip file containing fish observation data  
@@ -545,3 +589,8 @@ barrier_table = table for storing barriers
 [MODELLED_CROSSINGS]  
 modelled_crossings_table = table for storing modelled crossings  
 strahler_order_barrier_limit = all crossings on streams with strahler order less than this will be considered barriers and treated similar to dams/waterfalls for habitat modelling  
+
+[HABITAT_STATS]
+stats_table = this table will be created in the [DATABASE].data_schema schema and contain watershed statistics
+
+watershed_data_schemas=ws17010302,ws17010301 #this is the list of processing schemas to include in the stats the schemas must exist and data must be processed

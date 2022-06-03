@@ -25,9 +25,10 @@ import shapely.geometry
 import psycopg2.extras
 from collections import deque
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
-
+iniSection = appconfig.args.args[0]
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
 dbTargetTable = appconfig.config['PROCESSING']['stream_table']
+
 dbSourceGeom = appconfig.config['ELEVATION_PROCESSING']['3dgeometry_field']
 dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['smoothedgeometry_field']
     

@@ -27,10 +27,12 @@ from collections import deque
 import psycopg2.extras
 
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
-watershed_id = appconfig.config['PROCESSING']['watershed_id']
+iniSection = appconfig.args.args[0]
 
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
+watershed_id = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
+
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 dbModelledCrossingsTable = appconfig.config['MODELLED_CROSSINGS']['modelled_crossings_table']
 

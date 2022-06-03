@@ -26,14 +26,16 @@ import appconfig
 import zipfile
 import tempfile
 
-rawData = appconfig.config['PROCESSING']['fish_observation_data'];
+iniSection = appconfig.args.args[0]
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
+rawData = appconfig.config[iniSection]['fish_observation_data'];
+
+dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 aquaticHabitatFile = "AquaticHabitat.shp"
 fishStockingFile = "FishCultureStocking.shp"
 fishSurveyFile = "FishSurvey.shp"
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
-dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
 
 #unzip data to temp location

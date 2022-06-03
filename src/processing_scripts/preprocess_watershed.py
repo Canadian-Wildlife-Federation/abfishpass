@@ -21,9 +21,10 @@
 #
 import appconfig
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
+iniSection = appconfig.args.args[0]
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
+workingWatershedId = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
-workingWatershedId = appconfig.config['PROCESSING']['watershed_id']
 
 def main():
     with appconfig.connectdb() as conn:

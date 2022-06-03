@@ -25,12 +25,12 @@ import appconfig
 import shapely.wkb
 from collections import deque
 import psycopg2.extras
-from processing_scripts.compute_updown_barriers_fish import dbModelledCrossingsTable
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
-watershed_id = appconfig.config['PROCESSING']['watershed_id']
-
+iniSection = appconfig.args.args[0]
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
+watershed_id = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
+
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 dbCrossingsTable = appconfig.config['MODELLED_CROSSINGS']['modelled_crossings_table']
 
@@ -305,21 +305,21 @@ def writeResults(connection):
 def assignBarrierSpeciesCounts(connection):
     
     query = f"""
-        UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
+        UPDATE {dbTargetSchema}.{dbCrossingsTable}
         SET species_upstr = a.fish_survey_up,
             stock_upstr = a.fish_stock_up,
             barrier_cnt_upstr = a.barrier_up_cnt,
             barriers_upstr = a.barriers_up
         FROM {dbTargetSchema}.{dbTargetStreamTable} a
-        WHERE a.id =  {dbTargetSchema}.{dbModelledCrossingsTable}.stream_id_up;
+        WHERE a.id =  {dbTargetSchema}.{dbCrossingsTable}.stream_id_up;
         
-        UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
+        UPDATE {dbTargetSchema}.{dbCrossingsTable}
         SET species_downstr = a.fish_survey_down,
             stock_downstr = a.fish_stock_down,
             barrier_cnt_downstr = a.barrier_down_cnt,
             barriers_downstr = a.barriers_down
         FROM {dbTargetSchema}.{dbTargetStreamTable} a
-        WHERE a.id =  {dbTargetSchema}.{dbModelledCrossingsTable}.stream_id_down;
+        WHERE a.id =  {dbTargetSchema}.{dbCrossingsTable}.stream_id_down;
         
     """
     with connection.cursor() as cursor:

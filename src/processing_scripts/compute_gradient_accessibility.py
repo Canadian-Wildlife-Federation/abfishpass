@@ -29,8 +29,9 @@ from collections import deque
 import psycopg2.extras
 from appconfig import dataSchema
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
-watershed_id = appconfig.config['PROCESSING']['watershed_id']
+iniSection = appconfig.args.args[0]
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
+watershed_id = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbMaxDownGradientField = appconfig.config['GRADIENT_PROCESSING']['max_downstream_gradient_field']

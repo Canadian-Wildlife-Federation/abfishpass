@@ -23,15 +23,14 @@
 import appconfig
 from imagecodecs.imagecodecs import NONE
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
-dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
-
+iniSection = appconfig.args.args[0]
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
+watershed_id = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
-watershed_id = appconfig.config['PROCESSING']['watershed_id']
+dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
 dbCrossingsTable = appconfig.config['MODELLED_CROSSINGS']['modelled_crossings_table']
-
 dbVertexTable = appconfig.config['GRADIENT_PROCESSING']['vertex_gradient_table']
 
 def breakstreams (conn):

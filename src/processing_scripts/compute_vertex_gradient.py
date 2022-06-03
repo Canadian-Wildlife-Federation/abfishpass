@@ -26,8 +26,11 @@
 #
 import appconfig
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
+iniSection = appconfig.args.args[0]
+
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
+
 dbMainstemField = appconfig.config['MAINSTEM_PROCESSING']['mainstem_id']
 dbDownMeasureField = appconfig.config['MAINSTEM_PROCESSING']['downstream_route_measure']
 dbUpMeasureField = appconfig.config['MAINSTEM_PROCESSING']['upstream_route_measure']

@@ -34,11 +34,12 @@ from collections import deque
 import uuid;
 import psycopg2.extras
 
+iniSection = appconfig.args.args[0]
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
-watershed_id = appconfig.config['PROCESSING']['watershed_id']
-
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
+watershed_id = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
+
 dbMainstemField = appconfig.config['MAINSTEM_PROCESSING']['mainstem_id']
 dbDownMeasureField = appconfig.config['MAINSTEM_PROCESSING']['downstream_route_measure']
 dbUpMeasureField = appconfig.config['MAINSTEM_PROCESSING']['upstream_route_measure']
