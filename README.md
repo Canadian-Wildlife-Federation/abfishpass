@@ -76,15 +76,15 @@ Currently processing includes:
 
 **Main Script**
 
-process_watershed.py -c config.ini <watershedid>
+process_watershed.py -c config.ini [watershedid]
 
 The watershedid field must be specified as a section header in the config.ini file. The section must describe the watershed processing details for example:
 
-[17010301]
-#Berland: 17010301
-watershed_id = 17010301
-output_schema = ws17010301
-fish_observation_data = C:\temp\fishobservationdata.zip
+[17010301]  
+#Berland: 17010301  
+watershed_id = 17010301  
+output_schema = ws17010301  
+fish_observation_data = C:\temp\fishobservationdata.zip  
 
 **Input Requirements**
 
