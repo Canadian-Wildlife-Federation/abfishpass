@@ -175,8 +175,8 @@ load_modelled_corssings.py
 **Output**
 
 * A new modelled crossings table with a reference to the stream edge the crossing crosses. 
-*M odelled crossings with strahler_order >= 5 are classified as sub_type of bridge and a passability status of PASSABLE
-* Updated barriers table that now includes modelled crossing that occur on streams with strahler order < 5
+* Modelled crossings with strahler_order >= 6 are classified as sub_type of bridge and a passability status of PASSABLE
+* Updated barriers table that now includes modelled crossing that occur on streams with strahler order < 6
  
 ---
 #### 4 - Mainstems
@@ -366,7 +366,7 @@ Segments are classified as:
 
 Barriers include:
 * CABD loaded barriers (dams, waterfalls)
-* modelled crossing on streams with strahler order < 5
+* modelled crossing on streams with strahler order < 6
 
 **Script**
 
