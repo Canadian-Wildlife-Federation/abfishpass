@@ -20,15 +20,22 @@ import configparser
 import os
 import psycopg2 as pg2
 import psycopg2.extras
-import sys
+import enum 
+import argparse
 
 NODATA = -999999
 
 #users can optionally specify a configuration file
 configfile = "config.ini"
-if (len(sys.argv) > 1):
-    configfile = sys.argv[1]
-    
+
+parser = argparse.ArgumentParser(description='Process habitat modelling for watershed.')
+parser.add_argument('-c', type=str, help='the configuration file', required=False);
+parser.add_argument('args', type=str, nargs='*');
+args = parser.parse_args()
+if (args.c):
+    configfile = args.c
+
+   
 
 config = configparser.ConfigParser()
 config.read(configfile)
@@ -46,12 +53,21 @@ dbPassword = config['DATABASE']['password'];
 
 dataSchema = config['DATABASE']['data_schema'];
 streamTable = config['DATABASE']['stream_table'];
+streamTableDischargeField = "discharge";
+streamTableChannelConfinementField = "channel_confinement";
+fishSpeciesTable = config['DATABASE']['fish_species_table'];
 
 dataSrid = config['DATABASE']['working_srid']  
 
 dbIdField = "id"
 dbGeomField = "geometry"
 dbWatershedIdField = "watershed_id"
+
+class Accessibility(enum.Enum):
+    ACCESSIBLE = 'ACCESSIBLE'
+    POTENTIAL = 'POTENTIALLY ACCESSIBLE'
+    NOT = 'NOT ACCESSIBLE'
+
 
 print(f"""--- Configuration Settings Begin ---
 Database: {dbHost}:{dbPort}:{dbName}:{dbUser}

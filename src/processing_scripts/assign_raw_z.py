@@ -31,11 +31,11 @@ from math import floor
 import json
 import psycopg2.extras
 
-
-watershed_id = appconfig.config['PROCESSING']['watershed_id']
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
-
+iniSection = appconfig.args.args[0]
+watershed_id = appconfig.config[iniSection]['watershed_id']
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
 dbTargetTable = appconfig.config['PROCESSING']['stream_table']
+
 dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['3dgeometry_field']
 demDir = appconfig.config['ELEVATION_PROCESSING']['dem_directory'];
 
@@ -339,23 +339,28 @@ def findElevation(x, y):
     return appconfig.NODATA    
 
 #--- main program ---
-with appconfig.connectdb() as conn:
+def main():
     
-    prepareOutput(conn);
-
-    demfiles = indexDem()
+    with appconfig.connectdb() as conn:
+        
+        prepareOutput(conn);
     
-    #process each dem file
-    print("Computing Elevations")
-    for demfile in demfiles:
-        processArea(demfile, conn)
-
-    #search for any missing coordinates that may require 
-    #multiple dem files to compute
-    #if we have one giant dem file then ignore this
-    if (len(demfiles) > 1):
-        print ("  computing overlap areas")
+        demfiles = indexDem()
+        
+        #process each dem file
+        print("Computing Elevations")
         for demfile in demfiles:
-            processArea(demfile, conn, True)
+            processArea(demfile, conn)
+    
+        #search for any missing coordinates that may require 
+        #multiple dem files to compute
+        #if we have one giant dem file then ignore this
+        if (len(demfiles) > 1):
+            print ("  computing overlap areas")
+            for demfile in demfiles:
+                processArea(demfile, conn, True)
 
-print("done")
+    print("done")
+
+if __name__ == "__main__":
+    main()     

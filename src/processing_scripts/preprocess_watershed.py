@@ -17,43 +17,65 @@
 #----------------------------------------------------------------------------------
 
 #
-# snaps barriers to the stream table
 # ASSUMPTION - data is in equal area projection where distance functions return values in metres
 #
 import appconfig
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
+iniSection = appconfig.args.args[0]
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
+workingWatershedId = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
-workingWatershedId = appconfig.config['PROCESSING']['watershed_id']
 
-with appconfig.connectdb() as conn:
+def main():
+    with appconfig.connectdb() as conn:
+        
+        query = f"""
+            CREATE SCHEMA IF NOT EXISTS {dbTargetSchema};
+        
+            CREATE TABLE IF NOT EXISTS {dbTargetSchema}.{dbTargetStreamTable}(
+              {appconfig.dbIdField} uuid not null,
+              source_id uuid not null,
+              {appconfig.dbWatershedIdField} varchar not null,
+              stream_name varchar,
+              strahler_order integer,
+              segment_length double precision,
+              geometry geometry(LineString, {appconfig.dataSrid}),
+              primary key ({appconfig.dbIdField})
+            );
+        
+            CREATE INDEX {dbTargetSchema}_{dbTargetStreamTable}_geometry_idx ON  {dbTargetSchema}.{dbTargetStreamTable} using gist(geometry);
+            
+            --ensure results are readable
+            GRANT USAGE ON SCHEMA {dbTargetSchema} TO public;
+            GRANT SELECT ON {dbTargetSchema}.{dbTargetStreamTable} to public;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA {dbTargetSchema} GRANT SELECT ON TABLES TO public;
     
-    query = f"""
-        CREATE SCHEMA IF NOT EXISTS {dbTargetSchema};
+            DELETE FROM {dbTargetSchema}.{dbTargetStreamTable} WHERE {appconfig.dbWatershedIdField} = '{workingWatershedId}';
     
-        CREATE TABLE IF NOT EXISTS {dbTargetSchema}.{dbTargetStreamTable}(
-          {appconfig.dbIdField} uuid not null,
-          source_id uuid not null,
-          {appconfig.dbWatershedIdField} varchar not null,
-          stream_name varchar,
-          geometry geometry(LineString, {appconfig.dataSrid}),
-          primary key ({appconfig.dbIdField})
-        );
-    
-        --ensure results are readable
-        GRANT USAGE ON SCHEMA {dbTargetSchema} TO public;
-        GRANT SELECT ON {dbTargetSchema}.{dbTargetStreamTable} to public;
-    
-        DELETE FROM {dbTargetSchema}.{dbTargetStreamTable} WHERE {appconfig.dbWatershedIdField} = '{workingWatershedId}';
+            INSERT INTO {dbTargetSchema}.{dbTargetStreamTable} 
+                ({appconfig.dbIdField}, source_id, {appconfig.dbWatershedIdField}, 
+                stream_name, strahler_order, segment_length, geometry)
+            SELECT uuid_generate_v4(), {appconfig.dbIdField},
+                 {appconfig.dbWatershedIdField}, stream_name, strahler_order, 
+                 st_length2d(geometry) / 1000.0, geometry
+            FROM {appconfig.dataSchema}.{appconfig.streamTable}
+            WHERE {appconfig.dbWatershedIdField} = '{workingWatershedId}';
+            
+            
+            --TODO: remove this when values are provided
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} add column {appconfig.streamTableChannelConfinementField} numeric;
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} add column {appconfig.streamTableDischargeField} numeric;
+            
+            UPDATE {dbTargetSchema}.{dbTargetStreamTable} set {appconfig.streamTableChannelConfinementField} = floor(random() * 100);
+            UPDATE {dbTargetSchema}.{dbTargetStreamTable} set {appconfig.streamTableDischargeField} = floor(random() * 100);
+            
+       
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+        conn.commit();
+        
+    print(f"""Initializing processing for watershed {workingWatershedId} complete.""")
 
-        INSERT INTO {dbTargetSchema}.{dbTargetStreamTable} ({appconfig.dbIdField}, source_id, {appconfig.dbWatershedIdField}, stream_name, geometry)
-        SELECT uuid_generate_v4(), {appconfig.dbIdField}, {appconfig.dbWatershedIdField}, stream_name, geometry
-        FROM {appconfig.dataSchema}.{appconfig.streamTable}
-        WHERE {appconfig.dbWatershedIdField} = '{workingWatershedId}';
-   
-    """
-    with conn.cursor() as cursor:
-        cursor.execute(query)
-    conn.commit();
-    
-print(f"""Initializing processing for watershed {workingWatershedId} complete.""")
+if __name__ == "__main__":
+    main()     

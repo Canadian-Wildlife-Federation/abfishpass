@@ -21,10 +21,16 @@
 # Assume - data projection is m length projection or else need to modify how length is computed
 # Requires stream name field, in this field a value of UNNAMED represents no-name
 #
+# In addition to computing vertex and segment gradient it also computes the
+# maximum vertex gradient for the stream segment
+#
 import appconfig
 
-dbTargetSchema = appconfig.config['PROCESSING']['output_schema']
+iniSection = appconfig.args.args[0]
+
+dbTargetSchema = appconfig.config[iniSection]['output_schema']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
+
 dbMainstemField = appconfig.config['MAINSTEM_PROCESSING']['mainstem_id']
 dbDownMeasureField = appconfig.config['MAINSTEM_PROCESSING']['downstream_route_measure']
 dbUpMeasureField = appconfig.config['MAINSTEM_PROCESSING']['upstream_route_measure']
@@ -36,7 +42,6 @@ dbDownMeasureField = appconfig.config['MAINSTEM_PROCESSING']['downstream_route_m
 dbUpMeasureField = appconfig.config['MAINSTEM_PROCESSING']['upstream_route_measure']
 
 db4dGeomField = "geometryzm"
-dbSegmentGradientField = appconfig.config['GRADIENT_PROCESSING']['segment_gradient_field']
  
 def setupGeometry(connection):
     
@@ -99,62 +104,35 @@ def computeVertexGraidents(connection):
               ELSE 0
         END;
 
-
- --SELECT
-    --mainstem_id,
-    --min(downstream_route_measure) AS downstream_route_measure,
-    --grade_class as gradient_class
-  --FROM
- -- (
-    --SELECT
-    --  mainstem_id,
-    --  downstream_route_measure,
-    --  grade_class,
-    --  count(step OR NULL) OVER (ORDER BY mainstem_id, downstream_route_measure) AS grp
-    --FROM  (
-     -- SELECT mainstem_id, downstream_route_measure, grade_class
-     --      , lag(grade_class, 1, grade_class) OVER (ORDER BY mainstem_id, downstream_route_measure) <> grade_class AS step
-    --  FROM ws17010302.vertex_gradient
-   -- ) sub1
-  --WHERE grade_class != 0
-  --) sub2
-  --GROUP BY mainstem_id, grade_class, grp
-  --ORDER BY mainstem_id, downstream_route_measure
-    """
-    #print (query)
-    with connection.cursor() as cursor:
-        cursor.execute(query)    
-            
-    connection.commit()
-
-
-def computeSegmentGradient(connection):
-
-    query = f"""
-        ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN IF NOT EXISTS {dbSegmentGradientField} double precision;
         
-        UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-        SET {dbSegmentGradientField} = (ST_Z (ST_PointN ({db4dGeomField}, 1)) - ST_Z (ST_PointN ({db4dGeomField}, -1))) / ST_Length ({db4dGeomField})
+        alter table {dbTargetSchema}.{dbTargetStreamTable} 
+        drop column {db4dGeomField};
     """
+    
     #print (query)
     with connection.cursor() as cursor:
         cursor.execute(query)    
             
     connection.commit()
-    
-#--- main program ---    
-with appconfig.connectdb() as conn:
-    
-    conn.autocommit = False
-    
-    print("Computing Gradient")
-    print(" setting up tables")
-    setupGeometry(conn)
-    
-    print("  computing vertex gradients")
-    computeVertexGraidents(conn)
-    
-    print("  computing segment gradients")
-    computeSegmentGradient(conn)
-print("done")
 
+
+
+
+def main():
+    #--- main program ---    
+    with appconfig.connectdb() as conn:
+        
+        conn.autocommit = False
+        
+        print("Computing Gradient")
+        print("  setting up tables")
+        setupGeometry(conn)
+        
+        print("  computing vertex gradients")
+        computeVertexGraidents(conn)
+        
+        
+    print("done")
+
+if __name__ == "__main__":
+    main() 

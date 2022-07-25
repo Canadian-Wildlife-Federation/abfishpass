@@ -137,8 +137,34 @@ query = f"""
         primary key(id)
     );
     create index {trailTable}_geom_idx on {appconfig.dataSchema}.{trailTable} using gist(geometry);
-
-
+    
+    create table {appconfig.dataSchema}.{appconfig.fishSpeciesTable}(
+        code varchar(4),
+        name varchar,
+        allcodes varchar[],
+        
+        accessibility_gradient double precision not null,
+        
+        habitat_gradient_min numeric,
+        habitat_gradient_max numeric,
+        
+        habitat_discharge_min numeric,
+        habitat_discharge_max numeric,
+        
+        habitat_channel_confinement_min numeric,
+        habitat_channel_confinement_max numeric,
+        
+        primary key (code)
+    );
+    insert into {appconfig.dataSchema}.{appconfig.fishSpeciesTable}(
+        code, name, allcodes, accessibility_gradient, 
+        habitat_gradient_min,habitat_gradient_max,habitat_discharge_min,habitat_discharge_max,
+        habitat_channel_confinement_min, habitat_channel_confinement_max)
+    values 
+        ('argr', 'Arctic Grayling', ARRAY['argr'], 0.35, 0, 0.35, 0, 100, 0, 100),
+        ('wbtr', 'Western Arctic Bull Trout', ARRAY['wbtr', 'bltr'], 0.35, 0, 0.35, 0, 100, 0, 100),
+        ('mnwh', 'Mountain Whitefish', ARRAY['mnwh'], 0.35, 0, 0.35, 0, 100, 0, 100),
+        ('artr', 'Athabasca Rainbow Trout', ARRAY['artr', 'rntr'], 0.35, 0, 0.35, 0, 100, 0, 100);
 """
 #print (query)
 with appconfig.connectdb() as conn:
