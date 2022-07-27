@@ -171,7 +171,7 @@ def computeCrossings(connection):
 
 def computeAttributes(connection):
     
-    #assign all modelled crossings on 5th order streams and above a 
+    #assign all modelled crossings on 6th order streams and above a 
     #crossing_subtype of 'bridge' and a passability_status of 'passable'
     #https://github.com/egouge/cwf-alberta/issues/1
     
@@ -182,11 +182,16 @@ def computeAttributes(connection):
           passability_status = 'PASSABLE'
         WHERE strahler_order >= {orderBarrierLimit};
         
-        --set everything else to barrier for now
+        --set everything else to potential for now
         UPDATE {dbTargetSchema}.{dbCrossingsTable}
         SET 
-          passability_status = 'BARRIER'
-        WHERE passability_status is null; 
+          passability_status = 'POTENTIAL BARRIER'
+        WHERE passability_status is null;
+    
+        --set every crossing to crossing_status 'modelled'
+        UPDATE {dbTargetSchema}.{dbCrossingsTable}
+        SET
+          crossing_status = 'MODELLED';
     """
     #print(query)
     with connection.cursor() as cursor:
@@ -199,7 +204,7 @@ def addToBarriers(connection):
           (cabd_id, original_point, snapped_point, name, type)
         SELECT null, geometry, geometry, null, 'modelled_crossing'
         FROM {dbTargetSchema}.{dbCrossingsTable}
-        WHERE passability_status = 'BARRIER';
+        WHERE passability_status = 'POTENTIAL BARRIER';
     """
     #print(query)
     with connection.cursor() as cursor:
