@@ -86,7 +86,7 @@ def createTable(connection):
             
             geometry geometry(Point, {appconfig.dataSrid}),
             
-            primary key(id)
+            primary key (modelled_id)
         );
         
     """
@@ -201,9 +201,13 @@ def computeAttributes(connection):
 def addToBarriers(connection):
         
     query = f"""
-        INSERT INTO {dbTargetSchema}.{dbBarrierTable}
-          (cabd_id, original_point, snapped_point, name, type)
-        SELECT null, geometry, geometry, null, 'modelled_crossing'
+        INSERT INTO {dbTargetSchema}.{dbBarrierTable}(
+            modelled_id, original_point, snapped_point, type,
+            crossing_subtype, passability_status, crossing_status
+        )
+        SELECT 
+            modelled_id, geometry, geometry, 'modelled_crossing',
+            crossing_subtype, passability_status, crossing_status
         FROM {dbTargetSchema}.{dbCrossingsTable}
         WHERE passability_status = 'POTENTIAL BARRIER';
     """

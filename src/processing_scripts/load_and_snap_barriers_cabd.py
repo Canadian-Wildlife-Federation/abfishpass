@@ -53,15 +53,57 @@ def main():
     print(f"""CABD : {cabdHost}:{cabdPort}:{cabdName}:{cabdUser}""")   
     
     with appconfig.connectdb() as conn:
-        
+        #creates barriers table with attributes from CABD and crossings table
         query = f"""
             create table if not exists {dbTargetSchema}.{dbBarrierTable} (
                 id uuid not null default uuid_generate_v4(),
                 cabd_id uuid,
+                modelled_id uuid,
+                assessment_id varchar,
                 original_point geometry(POINT, {appconfig.dataSrid}),
                 snapped_point geometry(POINT, {appconfig.dataSrid}),
                 name varchar(256),
                 type varchar(32),
+
+                dam_name_en varchar(512),
+                dam_owner varchar(512),
+                use_code smallint,
+
+                disp_num varchar,
+                stream_name varchar,
+                strahler_order integer,
+                stream_id uuid,
+                stream_measure numeric,
+                wshed_name varchar,
+                wshed_priority varchar,
+              --feature_name varchar,
+                ownership_type varchar,
+
+                species_upstr varchar[],
+                species_downstr varchar[],
+                stock_upstr varchar[],
+                stock_downstr varchar[],
+
+                barriers_upstr varchar[],
+                barriers_downstr varchar[],
+                barrier_cnt_upstr integer,
+                barrier_cnt_downstr integer,
+                
+                critical_habitat varchar[],
+                
+                passability_status varchar,
+                last_inspection date,
+                
+                crossing_status varchar CHECK (crossing_status in ('MODELLED', 'ASSESSED', 'HABITAT_CONFIRMATION', 'DESIGN', 'REMEDIATED')),
+                crossing_feature_type varchar CHECK (crossing_feature_type IN ('ROAD', 'RAIL', 'TRAIL')),
+                crossing_type varchar,
+                crossing_subtype varchar,
+                
+                habitat_quality varchar,
+                year_planned integer,
+                year_complete integer,
+                comments varchar,
+
                 primary key (id)
             );
             
@@ -85,7 +127,7 @@ def main():
             
             extentgeom = data[0];
             
-        
+        #TO DO: Get additional fields from CABD - dam owner, dam use_code
         barriers = (("Dams", "dams.dams", "dam", "case when dam_name_en is not null then dam_name_en else dam_name_fr end"),
                     ("Waterfalls", "waterfalls.waterfalls", "waterfall", "case when fall_name_en is not null then fall_name_en else fall_name_fr end")
                     )
