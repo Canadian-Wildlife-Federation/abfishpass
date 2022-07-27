@@ -47,7 +47,8 @@ def createTable(connection):
         DROP TABLE IF EXISTS {dbTargetSchema}.{dbCrossingsTable};
         
         CREATE TABLE {dbTargetSchema}.{dbCrossingsTable} (
-            id uuid default uuid_generate_v4(),
+            modelled_id uuid default uuid_generate_v4(),
+            assessment_id varchar,
             disp_num varchar,
             stream_name varchar,
             strahler_order integer,

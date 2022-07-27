@@ -245,7 +245,7 @@ def updateModelledCrossing(connection):
         UPDATE {dbTargetSchema}.{dbCrossingsTable}
             SET stream_id_up = a.stream_id
             FROM ids a
-            WHERE a.crossingid = {dbTargetSchema}.{dbCrossingsTable}.id;
+            WHERE a.crossingid = {dbTargetSchema}.{dbCrossingsTable}.modelled_id;
             
             
         ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN stream_id_down uuid;
