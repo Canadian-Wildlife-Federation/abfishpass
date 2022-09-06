@@ -157,6 +157,10 @@ def computeConfinementModel(connection):
             """
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
+
+# TO DO: add function to calculate general habitat suitability
+# for each species, after habitat parameters are broken out
+# into spawning and rearing
             
 def main():                            
     #--- main program ---    
