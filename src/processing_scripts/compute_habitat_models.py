@@ -30,12 +30,12 @@ dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbSegmentGradientField = appconfig.config['GRADIENT_PROCESSING']['segment_gradient_field']
 
-    
+# TO DO: calculate separately for spawning and rearing    
 def computeGradientModel(connection):
         
     query = f"""
         SELECT code, name, 
-        habitat_gradient_min, habitat_gradient_max
+        spawn_gradient_min, spawn_gradient_max
         FROM {dataSchema}.{appconfig.fishSpeciesTable};
     """
     
@@ -51,7 +51,7 @@ def computeGradientModel(connection):
             
             print("  processing " + name)
             
-            colname = "habitat_gradient_" + code; 
+            colname = "habitat_spawn_gradient_" + code; 
             
             query = f"""
             
@@ -75,12 +75,12 @@ def computeGradientModel(connection):
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
 
-
+# TO DO: calculate separately for spawning and rearing  
 def computeDischargeModel(connection):
         
     query = f"""
         SELECT code, name, 
-        habitat_discharge_min, habitat_discharge_max
+        spawn_discharge_min, spawn_discharge_max
         FROM {dataSchema}.{appconfig.fishSpeciesTable};
     """
 
@@ -96,7 +96,7 @@ def computeDischargeModel(connection):
             
             print("  processing " + name)
             
-            colname = "habitat_discharge_" + code; 
+            colname = "habitat_spawn_discharge_" + code; 
             
             query = f"""
             
@@ -120,12 +120,12 @@ def computeDischargeModel(connection):
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
 
-
+# TO DO: calculate separately for spawning and rearing  
 def computeConfinementModel(connection):
         
     query = f"""
         SELECT code, name, 
-        habitat_channel_confinement_min, habitat_channel_confinement_max
+        spawn_channel_confinement_min, spawn_channel_confinement_max
         FROM {dataSchema}.{appconfig.fishSpeciesTable};
     """
 
@@ -141,7 +141,7 @@ def computeConfinementModel(connection):
             
             print("  processing " + name)
             
-            colname = "habitat_channelconfinement_" + code; 
+            colname = "habitat_spawn_channel_confinement_" + code; 
             
             query = f"""
             

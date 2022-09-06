@@ -31,14 +31,20 @@ query = f"""
         
         accessibility_gradient double precision not null,
         
-        habitat_gradient_min numeric,
-        habitat_gradient_max numeric,
+        spawn_gradient_min numeric,
+        spawn_gradient_max numeric,
+        rear_gradient_min numeric,
+        rear_gradient_max numeric,
         
-        habitat_discharge_min numeric,
-        habitat_discharge_max numeric,
+        spawn_discharge_min numeric,
+        spawn_discharge_max numeric,
+        rear_discharge_min numeric,
+        rear_discharge_max numeric,
         
-        habitat_channel_confinement_min numeric,
-        habitat_channel_confinement_max numeric,
+        spawn_channel_confinement_min numeric,
+        spawn_channel_confinement_max numeric,
+        rear_channel_confinement_min numeric,
+        rear_channel_confinement_max numeric,
         
         primary key (code)
 """

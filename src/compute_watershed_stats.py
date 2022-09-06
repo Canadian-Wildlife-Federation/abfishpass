@@ -71,14 +71,15 @@ def main():
                 allfishaccess = allfishaccess + " OR "
             allfishaccess = allfishaccess + f"""{fish}_accessibility = '{appconfig.Accessibility.ACCESSIBLE.value}' """
 
+            # TO DO: calculate separately for spawning and rearing?
             fishhabitat = f"""
                 {fishhabitat}                
                 WITH alldata AS ({alldataquery})
                 INSERT INTO {appconfig.dataSchema}.{statTable}(stat, value)
                 SELECT 
-                    CASE WHEN habitat_gradient_{fish} 
-                        AND habitat_discharge_{fish}
-                        AND habitat_channelconfinement_{fish}
+                    CASE WHEN habitat_spawn_gradient_{fish} 
+                        AND habitat_spawn_discharge_{fish}
+                        AND habitat_spawn_channel_confinement_{fish}
                     THEN  '{fish} fish habitat'
                     ELSE '{fish} not fish habitat'
                     END as ishabitat, sum(segment_length)
@@ -90,7 +91,7 @@ def main():
                 allfishhabitat = ''
             else:
                 allfishhabitat = allfishhabitat + " OR "
-            allfishhabitat = allfishhabitat + f"""(habitat_gradient_{fish} AND habitat_discharge_{fish} AND habitat_channelconfinement_{fish}) """
+            allfishhabitat = allfishhabitat + f"""(habitat_spawn_gradient_{fish} AND habitat_spawn_discharge_{fish} AND habitat_spawn_channel_confinement_{fish}) """
             
         allfishaccess = f"""
             WITH alldata AS ({alldataquery})

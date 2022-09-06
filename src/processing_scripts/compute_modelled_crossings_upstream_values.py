@@ -79,16 +79,16 @@ def createNetwork(connection):
         FROM {appconfig.dataSchema}.{appconfig.fishSpeciesTable} a
     """
     
-    
-    accessabilitymodel = ''
+    # TO DO: calculate separately for spawning and rearing?
+    accessibilitymodel = ''
     habitatmodel = ''
     with connection.cursor() as cursor:
         cursor.execute(query)
         features = cursor.fetchall()
         for feature in features:
             species.append(feature[0])
-            accessabilitymodel = accessabilitymodel + ', ' + feature[0] + '_accessibility'
-            habitatmodel = habitatmodel + ', habitat_discharge_' + feature[0] + ' AND habitat_gradient_' + feature[0] + ' AND habitat_channelconfinement_' + feature[0] 
+            accessibilitymodel = accessibilitymodel + ', ' + feature[0] + 'spawn_accessibility'
+            habitatmodel = habitatmodel + ', habitat_spawn_discharge_' + feature[0] + ' AND habitat_spawn_gradient_' + feature[0] + ' AND habitat_spawn_channel_confinement_' + feature[0] 
             
     
     
@@ -96,7 +96,7 @@ def createNetwork(connection):
         SELECT a.{appconfig.dbIdField} as id, 
             st_length(a.{appconfig.dbGeomField}), a.{appconfig.dbGeomField},
             barrier_up_cnt
-            {accessabilitymodel} {habitatmodel}
+            {accessibilitymodel} {habitatmodel}
         FROM {dbTargetSchema}.{dbTargetStreamTable} a
     """
    
