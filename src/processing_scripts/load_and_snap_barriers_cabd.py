@@ -55,6 +55,8 @@ def main():
     with appconfig.connectdb() as conn:
         #creates barriers table with attributes from CABD and crossings table
         query = f"""
+            DROP TABLE IF EXISTS {dbTargetSchema}.{dbBarrierTable};
+
             create table if not exists {dbTargetSchema}.{dbBarrierTable} (
                 id uuid not null default uuid_generate_v4(),
                 cabd_id uuid,

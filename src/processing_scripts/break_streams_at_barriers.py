@@ -236,7 +236,7 @@ def updateModelledCrossing(connection):
         UPDATE {dbTargetSchema}.{dbCrossingsTable} SET stream_id_up = null;
         
         WITH ids AS (
-            SELECT a.id as stream_id, b.id as crossingid
+            SELECT a.id as stream_id, b.modelled_id as crossingid
             FROM {dbTargetSchema}.{dbTargetStreamTable} a,
                 {dbTargetSchema}.{dbCrossingsTable} b
             WHERE a.geometry && st_buffer(b.geometry, 0.0000001) and
@@ -251,7 +251,7 @@ def updateModelledCrossing(connection):
         ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN stream_id_down uuid;
         
         WITH ids AS (
-            SELECT a.id as stream_id, b.id as crossingid
+            SELECT a.id as stream_id, b.modelled_id as crossingid
             FROM {dbTargetSchema}.{dbTargetStreamTable} a,
                 {dbTargetSchema}.{dbCrossingsTable} b
             WHERE a.geometry && st_buffer(b.geometry, 0.0000001) and
@@ -260,7 +260,7 @@ def updateModelledCrossing(connection):
         UPDATE {dbTargetSchema}.{dbCrossingsTable}
             SET stream_id_down = a.stream_id
             FROM ids a
-            WHERE a.crossingid = {dbTargetSchema}.{dbCrossingsTable}.id;
+            WHERE a.crossingid = {dbTargetSchema}.{dbCrossingsTable}.modelled_id;
     """
     #load geometries and create a network
     with connection.cursor() as cursor:
