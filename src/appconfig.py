@@ -29,8 +29,8 @@ NODATA = -999999
 configfile = "config.ini"
 
 parser = argparse.ArgumentParser(description='Process habitat modelling for watershed.')
-parser.add_argument('-c', type=str, help='the configuration file', required=False);
-parser.add_argument('args', type=str, nargs='*');
+parser.add_argument('-c', type=str, help='the configuration file', required=False)
+parser.add_argument('args', type=str, nargs='*')
 args = parser.parse_args()
 if (args.c):
     configfile = args.c
@@ -40,22 +40,22 @@ if (args.c):
 config = configparser.ConfigParser()
 config.read(configfile)
 
-ogr = config['OGR']['ogr'];
+ogr = config['OGR']['ogr']
 proj = config['OGR']['proj']; 
-gdalinfo = config['OGR']['gdalinfo'];
-gdalsrsinfo = config['OGR']['gdalsrsinfo'];
+gdalinfo = config['OGR']['gdalinfo']
+gdalsrsinfo = config['OGR']['gdalsrsinfo']
 
-dbHost = config['DATABASE']['host'];
-dbPort = config['DATABASE']['port'];
-dbName = config['DATABASE']['name'];
-dbUser = config['DATABASE']['user'];
-dbPassword = config['DATABASE']['password'];
+dbHost = config['DATABASE']['host']
+dbPort = config['DATABASE']['port']
+dbName = config['DATABASE']['name']
+dbUser = config['DATABASE']['user']
+dbPassword = config['DATABASE']['password']
 
-dataSchema = config['DATABASE']['data_schema'];
-streamTable = config['DATABASE']['stream_table'];
-streamTableDischargeField = "discharge";
-streamTableChannelConfinementField = "channel_confinement";
-fishSpeciesTable = config['DATABASE']['fish_species_table'];
+dataSchema = config['DATABASE']['data_schema']
+streamTable = config['DATABASE']['stream_table']
+streamTableDischargeField = "discharge"
+streamTableChannelConfinementField = "channel_confinement"
+fishSpeciesTable = config['DATABASE']['fish_species_table']
 
 dataSrid = config['DATABASE']['working_srid']  
 

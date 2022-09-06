@@ -45,18 +45,18 @@ workingWatershedId = appconfig.config[iniSection]['watershed_id']
 print ("Processing: " + workingWatershedId)
 
 
-preprocess_watershed.main();
+preprocess_watershed.main()
 load_and_snap_barriers_cabd.main()
 compute_modelled_crossings.main()
 compute_mainstems.main()
 assign_raw_z.main()
-smooth_z.main();
-compute_vertex_gradient.main();
+smooth_z.main()
+compute_vertex_gradient.main()
 break_streams_at_barriers.main()
 #re-assign elevations to broken streams
 assign_raw_z.main()
-smooth_z.main();
-compute_segment_gradient.main();
+smooth_z.main()
+compute_segment_gradient.main()
 load_and_snap_fishobservation.main()
 compute_updown_barriers_fish.main()
 compute_gradient_accessibility.main()
