@@ -59,7 +59,7 @@ def setupGeometry(connection):
             
     connection.commit()
 
-def computeVertexGraidents(connection):
+def computeVertexGradients(connection):
 
     query = f"""
         DROP TABLE IF EXISTS {dbTargetSchema}.{dbVertexTable};
@@ -129,7 +129,7 @@ def main():
         setupGeometry(conn)
         
         print("  computing vertex gradients")
-        computeVertexGraidents(conn)
+        computeVertexGradients(conn)
         
         
     print("done")

@@ -166,7 +166,7 @@ def main():
         
         print("Computing Habitat Models Per Species")
         
-        print("  computing graident models per species")
+        print("  computing gradient models per species")
         computeGradientModel(conn)
         
         print("  computing discharge models per species")

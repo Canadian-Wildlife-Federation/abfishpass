@@ -61,10 +61,10 @@ class Node:
         
         minvalue = None;
         for edge in self.outedges:
-            if (edge.mindowngraident < 0 ): 
+            if (edge.mindowngradient < 0 ): 
                 return -1
-            elif (minvalue is None) or (edge.mindowngraident < minvalue):
-                minvalue = edge.mindowngraident
+            elif (minvalue is None) or (edge.mindowngradient < minvalue):
+                minvalue = edge.mindowngradient
         
         return minvalue;
     
@@ -76,7 +76,7 @@ class Edge:
         self.fid = fid
         self.visited = False
         self.maxgradient = maxgradient
-        self.mindowngraident = -1
+        self.mindowngradient = -1
 
         
 def createNetwork(connection):
@@ -142,7 +142,7 @@ def processNodes():
             continue;
         
         for edge in node.inedges:
-            edge.mindowngraident = max (edge.maxgradient, downg)
+            edge.mindowngradient = max (edge.maxgradient, downg)
             toprocess.append(edge.fromNode)
         
 
@@ -157,7 +157,7 @@ def writeResults(connection):
     newdata = []
     
     for edge in edges:
-        newdata.append( (edge.mindowngraident, edge.fid) )
+        newdata.append( (edge.mindowngradient, edge.fid) )
     
     with connection.cursor() as cursor:    
         psycopg2.extras.execute_batch(cursor, updatequery, newdata);
