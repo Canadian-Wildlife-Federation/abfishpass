@@ -79,7 +79,7 @@ def createNetwork(connection):
         FROM {appconfig.dataSchema}.{appconfig.fishSpeciesTable} a
     """
     
-    # TO DO: calculate separately for spawning and rearing?
+    # TO DO: calculate separately for spawning and rearing
     accessibilitymodel = ''
     habitatmodel = ''
     with connection.cursor() as cursor:
@@ -171,19 +171,19 @@ def processNodes():
             habitat[fish] = 0
             funchabitat[fish] = 0
         
-        outbarriercnt = 0;
+        outbarriercnt = 0
         
         for inedge in node.inedges:
             outbarriercnt += inedge.upbarriercnt
                 
             if not inedge.visited:
-                allvisited = False;
-                break;
+                allvisited = False
+                break
             else:
                 for fish in species:
-                    uplength[fish] = uplength[fish] + inedge.specaup[fish];
-                    habitat[fish] = habitat[fish] + inedge.habitatup[fish];
-                    funchabitat[fish] = funchabitat[fish] + inedge.funchabitatup[fish];                        
+                    uplength[fish] = uplength[fish] + inedge.specaup[fish]
+                    habitat[fish] = habitat[fish] + inedge.habitatup[fish]
+                    funchabitat[fish] = funchabitat[fish] + inedge.funchabitatup[fish]                    
                 
         if not allvisited:
             toprocess.append(node)
@@ -254,7 +254,7 @@ def writeResults(connection):
 
     
     with connection.cursor() as cursor:    
-        psycopg2.extras.execute_batch(cursor, updatequery, newdata);
+        psycopg2.extras.execute_batch(cursor, updatequery, newdata)
             
     for fish in species:
         

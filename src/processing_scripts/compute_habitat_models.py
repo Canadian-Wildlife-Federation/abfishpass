@@ -75,6 +75,49 @@ def computeGradientModel(connection):
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
 
+    query = f"""
+        SELECT code, name, 
+        rear_gradient_min, rear_gradient_max
+        FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+    
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        features = cursor.fetchall()
+        
+        for feature in features:
+            code = feature[0]
+            name = feature[1]
+            mingradient = feature[2]
+            maxgradient = feature[3]
+            
+            print("  processing " + name)
+            
+            colname = "habitat_rear_gradient_" + code; 
+            
+            query = f"""
+            
+                alter table {dbTargetSchema}.{dbTargetStreamTable} 
+                    add column if not exists {colname} boolean;
+        
+                update {dbTargetSchema}.{dbTargetStreamTable} 
+                    set {colname} = false;
+                
+                UPDATE {dbTargetSchema}.{dbTargetStreamTable}
+                set {colname} = true
+                WHERE
+                {code}_accessibility in ( '{appconfig.Accessibility.ACCESSIBLE.value}',
+                    '{appconfig.Accessibility.POTENTIAL.value}')
+                AND 
+                {dbSegmentGradientField} >= {mingradient} 
+                AND 
+                {dbSegmentGradientField} < {maxgradient}
+                
+            """
+            with connection.cursor() as cursor2:
+                cursor2.execute(query)
+
+
 # TO DO: calculate separately for spawning and rearing  
 def computeDischargeModel(connection):
         
@@ -120,6 +163,48 @@ def computeDischargeModel(connection):
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
 
+    query = f"""
+        SELECT code, name, 
+        rear_discharge_min, rear_discharge_max
+        FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        features = cursor.fetchall()
+        
+        for feature in features:
+            code = feature[0]
+            name = feature[1]
+            minvelocity = feature[2]
+            maxvelocity = feature[3]
+            
+            print("  processing " + name)
+            
+            colname = "habitat_rear_discharge_" + code; 
+            
+            query = f"""
+            
+                alter table {dbTargetSchema}.{dbTargetStreamTable} 
+                    add column if not exists {colname} boolean;
+        
+                update {dbTargetSchema}.{dbTargetStreamTable} 
+                    set {colname} = false;
+                
+                UPDATE {dbTargetSchema}.{dbTargetStreamTable}
+                set {colname} = true
+                WHERE
+                {code}_accessibility in ( '{appconfig.Accessibility.ACCESSIBLE.value}',
+                    '{appconfig.Accessibility.POTENTIAL.value}')
+                AND 
+                {appconfig.streamTableDischargeField} >= {minvelocity} 
+                AND 
+                {appconfig.streamTableDischargeField} < {maxvelocity}
+                
+            """
+            with connection.cursor() as cursor2:
+                cursor2.execute(query)
+
 # TO DO: calculate separately for spawning and rearing  
 def computeConfinementModel(connection):
         
@@ -142,6 +227,41 @@ def computeConfinementModel(connection):
             print("  processing " + name)
             
             colname = "habitat_spawn_channel_confinement_" + code; 
+            
+            query = f"""
+            
+                alter table {dbTargetSchema}.{dbTargetStreamTable} 
+                    add column if not exists {colname} boolean;
+        
+                update {dbTargetSchema}.{dbTargetStreamTable} 
+                    set {colname} = false;
+                
+                --TODO: implement model when defined
+                UPDATE {dbTargetSchema}.{dbTargetStreamTable}
+                set {colname} = true;                
+            """
+            with connection.cursor() as cursor2:
+                cursor2.execute(query)
+
+    query = f"""
+        SELECT code, name, 
+        rear_channel_confinement_min, rear_channel_confinement_max
+        FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        features = cursor.fetchall()
+        
+        for feature in features:
+            code = feature[0]
+            name = feature[1]
+            mincc = feature[2]
+            maxcc = feature[3]
+            
+            print("  processing " + name)
+            
+            colname = "habitat_rear_channel_confinement_" + code; 
             
             query = f"""
             

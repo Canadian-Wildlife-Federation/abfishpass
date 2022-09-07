@@ -71,7 +71,7 @@ def main():
                 allfishaccess = allfishaccess + " OR "
             allfishaccess = allfishaccess + f"""{fish}_accessibility = '{appconfig.Accessibility.ACCESSIBLE.value}' """
 
-            # TO DO: calculate separately for spawning and rearing?
+            # TO DO: calculate separately for spawning and rearing PLUS all habitat for spawning and rearing (non-additive)
             fishhabitat = f"""
                 {fishhabitat}                
                 WITH alldata AS ({alldataquery})
