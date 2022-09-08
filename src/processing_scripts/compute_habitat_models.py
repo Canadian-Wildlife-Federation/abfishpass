@@ -30,9 +30,9 @@ dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbSegmentGradientField = appconfig.config['GRADIENT_PROCESSING']['segment_gradient_field']
 
-# TO DO: calculate separately for spawning and rearing    
 def computeGradientModel(connection):
-        
+    
+    # spawning
     query = f"""
         SELECT code, name, 
         spawn_gradient_min, spawn_gradient_max
@@ -49,9 +49,9 @@ def computeGradientModel(connection):
             mingradient = feature[2]
             maxgradient = feature[3]
             
-            print("  processing " + name)
+            print("       processing " + name + " - spawning")
             
-            colname = "habitat_spawn_gradient_" + code; 
+            colname = "habitat_spawn_gradient_" + code
             
             query = f"""
             
@@ -75,6 +75,7 @@ def computeGradientModel(connection):
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
 
+    # rearing
     query = f"""
         SELECT code, name, 
         rear_gradient_min, rear_gradient_max
@@ -91,9 +92,9 @@ def computeGradientModel(connection):
             mingradient = feature[2]
             maxgradient = feature[3]
             
-            print("  processing " + name)
+            print("       processing " + name + " - rearing")
             
-            colname = "habitat_rear_gradient_" + code; 
+            colname = "habitat_rear_gradient_" + code
             
             query = f"""
             
@@ -118,9 +119,9 @@ def computeGradientModel(connection):
                 cursor2.execute(query)
 
 
-# TO DO: calculate separately for spawning and rearing  
 def computeDischargeModel(connection):
         
+    # spawning    
     query = f"""
         SELECT code, name, 
         spawn_discharge_min, spawn_discharge_max
@@ -137,9 +138,9 @@ def computeDischargeModel(connection):
             minvelocity = feature[2]
             maxvelocity = feature[3]
             
-            print("  processing " + name)
+            print("       processing " + name + " - spawning")
             
-            colname = "habitat_spawn_discharge_" + code; 
+            colname = "habitat_spawn_discharge_" + code
             
             query = f"""
             
@@ -163,6 +164,7 @@ def computeDischargeModel(connection):
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
 
+    # rearing
     query = f"""
         SELECT code, name, 
         rear_discharge_min, rear_discharge_max
@@ -179,9 +181,9 @@ def computeDischargeModel(connection):
             minvelocity = feature[2]
             maxvelocity = feature[3]
             
-            print("  processing " + name)
+            print("       processing " + name + " - rearing")
             
-            colname = "habitat_rear_discharge_" + code; 
+            colname = "habitat_rear_discharge_" + code
             
             query = f"""
             
@@ -205,9 +207,10 @@ def computeDischargeModel(connection):
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
 
-# TO DO: calculate separately for spawning and rearing  
+
 def computeConfinementModel(connection):
-        
+
+    # spawning      
     query = f"""
         SELECT code, name, 
         spawn_channel_confinement_min, spawn_channel_confinement_max
@@ -224,9 +227,9 @@ def computeConfinementModel(connection):
             mincc = feature[2]
             maxcc = feature[3]
             
-            print("  processing " + name)
+            print("       processing " + name + " - spawning")
             
-            colname = "habitat_spawn_channel_confinement_" + code; 
+            colname = "habitat_spawn_channel_confinement_" + code
             
             query = f"""
             
@@ -242,7 +245,8 @@ def computeConfinementModel(connection):
             """
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
-
+    
+    # rearing
     query = f"""
         SELECT code, name, 
         rear_channel_confinement_min, rear_channel_confinement_max
@@ -259,9 +263,9 @@ def computeConfinementModel(connection):
             mincc = feature[2]
             maxcc = feature[3]
             
-            print("  processing " + name)
+            print("       processing " + name + " - rearing")
             
-            colname = "habitat_rear_channel_confinement_" + code; 
+            colname = "habitat_rear_channel_confinement_" + code
             
             query = f"""
             
@@ -281,7 +285,81 @@ def computeConfinementModel(connection):
 # TO DO: add function to calculate general habitat suitability
 # for each species, after habitat parameters are broken out
 # into spawning and rearing
-            
+
+def computeHabitatModel(connection):
+
+    # spawning
+    query = f"""
+        SELECT code, name
+        FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        features = cursor.fetchall()
+    
+        for feature in features:
+            code = feature[0]
+            name = feature[1]
+
+            gradient = "habitat_spawn_gradient_" + code
+            discharge = "habitat_spawn_discharge_" + code
+            chn_confine = "habitat_spawn_channel_confinement_" + code
+
+            colname = "habitat_spawn_" + code
+
+            print("       processing " + name + " - spawning")
+
+            query = f"""
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable}
+                    ADD COLUMN IF NOT EXISTS {colname} boolean;
+                
+                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                    SET {colname} = false;
+
+                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                    SET {colname} = true
+                    WHERE {gradient} = true AND {discharge} = true AND {chn_confine} = true;
+            """
+            with connection.cursor() as cursor2:
+                cursor2.execute(query)
+
+    # rearing
+    query = f"""
+        SELECT code, name
+        FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        features = cursor.fetchall()
+    
+        for feature in features:
+            code = feature[0]
+            name = feature[1]
+
+            gradient = "habitat_rear_gradient_" + code
+            discharge = "habitat_rear_discharge_" + code
+            chn_confine = "habitat_rear_channel_confinement_" + code
+
+            colname = "habitat_rear_" + code
+
+            print("       processing " + name + " - rearing")
+
+            query = f"""
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable}
+                    ADD COLUMN IF NOT EXISTS {colname} boolean;
+                
+                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                    SET {colname} = false;
+
+                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                    SET {colname} = true
+                    WHERE {gradient} = true AND {discharge} = true AND {chn_confine} = true;
+            """
+            with connection.cursor() as cursor2:
+                cursor2.execute(query)
+
 def main():                            
     #--- main program ---    
     with appconfig.connectdb() as conn:
@@ -298,6 +376,9 @@ def main():
         
         print("  computing channel confinement models per species")
         computeConfinementModel(conn)
+
+        print(" computing spawning and rearing habitat models per species")
+        computeHabitatModel(conn)
         
     print("done")
 

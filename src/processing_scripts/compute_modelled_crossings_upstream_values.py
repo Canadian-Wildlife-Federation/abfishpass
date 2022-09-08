@@ -87,7 +87,7 @@ def createNetwork(connection):
         features = cursor.fetchall()
         for feature in features:
             species.append(feature[0])
-            accessibilitymodel = accessibilitymodel + ', ' + feature[0] + 'spawn_accessibility'
+            accessibilitymodel = accessibilitymodel + ', ' + feature[0] + '_accessibility'
             habitatmodel = habitatmodel + ', habitat_spawn_discharge_' + feature[0] + ' AND habitat_spawn_gradient_' + feature[0] + ' AND habitat_spawn_channel_confinement_' + feature[0] 
             
     
