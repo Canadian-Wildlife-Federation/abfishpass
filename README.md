@@ -165,7 +165,7 @@ This script computes modelled crossings defined as locations where rail, road, o
 
 **Script**
 
-load_modelled_corssings.py
+load_modelled_crossings.py
 
 **Input Requirements**
 
@@ -413,6 +413,10 @@ Computes a collection of modelled crossing statistics for each species and habit
  * total upstream length - total upstream length with habitat model = true
  * functional upstream area - computed by walking up the stream network summing up length of stream segments with habitat model = true, stopping at the first barrier encountered (upstream)
 
+ **Script**
+
+compute_modelled_crossings_upstream_values.py
+
 **Input Requirements**
 * stream network
 * modelled crossing
@@ -581,7 +585,7 @@ upstream_route_measure =name  upstream route measure field
 [GRADIENT_PROCESSING]  
 vertex_gradient_table = table for storing vertex gradient values   
 segment_gradient_field = name of segment gradient field (in streams table)  
-max_downstream_graident_field = name of field for storing the maximum downstream segment gradient (in streams table)  
+max_downstream_gradient_field = name of field for storing the maximum downstream segment gradient (in streams table)  
   
 [BARRIER_PROCESSING]  
 barrier_table = table for storing barriers  
