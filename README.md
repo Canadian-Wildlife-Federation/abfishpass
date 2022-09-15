@@ -16,13 +16,13 @@ http://www.apache.org/licenses/LICENSE-2.0
 
 # Software Requirements
 * Python (tested with version 3.9.5)
-    * Modules: shapely, psycopg2, tifffile
+    * Modules: shapely, psycopg2, tifffile, requests
     
     
-* GDAL/ORG (comes installed with QGIS or can install standalone)
+* GDAL/OGR (comes installed with QGIS or can install standalone)
 
 
-* Postgresql/PostGIS database
+* PostgreSQL/PostGIS database
 
 
 
@@ -141,8 +141,8 @@ preprocess_watershed.py
 
 ---
 #### 2 - Loading Barriers
-This script loads waterfalls and dam barriers from the CABD database.
-
+This script loads dam barriers from the CABD API.
+By default, the script uses the nhn_watershed_id for the subject watershed(s) to retrieve features from the API.
 
 **Script**
 
@@ -150,12 +150,12 @@ load_and_snap_barriers_cabd.py
 
 **Input Requirements**
 
-* Access to the CABD database
+* Access to the CABD API
 * Streams table populated from the preprocessing step 
 
 **Output**
 
-* A new barrier table populated with dam and waterfall barriers from the CABD database
+* A new barrier table populated with dam barriers from the CABD API
 * The barrier table has two geometry fields - the raw field and a snapped field (the geometry snapped to the stream network). The maximum snapping distance is specified in the configuration file.
 
 ---

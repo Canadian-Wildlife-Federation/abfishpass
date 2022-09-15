@@ -71,7 +71,7 @@ class Accessibility(enum.Enum):
 
 print(f"""--- Configuration Settings Begin ---
 Database: {dbHost}:{dbPort}:{dbName}:{dbUser}
-ORG: {ogr}
+OGR: {ogr}
 SRID: {dataSrid}
 Raw Data Schema: {dataSchema}
 --- Configuration Settings End ---
