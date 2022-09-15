@@ -56,7 +56,7 @@ def createTable(connection):
             stream_measure numeric,
             wshed_name varchar,
             wshed_priority varchar,
-            feature_name varchar,
+            transport_feature_name varchar,
             ownership_type varchar,
             
             species_upstr varchar[],
@@ -101,13 +101,13 @@ def computeCrossings(connection):
     query = f"""
         --roads
         INSERT INTO {dbTargetSchema}.{dbCrossingsTable} 
-            (stream_name, strahler_order, stream_id, feature_name, crossing_feature_type, geometry) 
+            (stream_name, strahler_order, stream_id, transport_feature_name, crossing_feature_type, geometry) 
         
         (       
             with intersections as (       
                 select st_intersection(a.geometry, b.geometry) as geometry,
                     a.id as stream_id, b.id as feature_id, 
-                    a.stream_name, a.strahler_order, b."name" as feature_name
+                    a.stream_name, a.strahler_order, b."name" as transport_feature_name
                 from {dbTargetSchema}.{dbTargetStreamTable}  a,
                      {appconfig.dataSchema}.{roadTable} b
                 where st_intersects(a.geometry, b.geometry)
@@ -116,7 +116,7 @@ def computeCrossings(connection):
                 select st_geometryn(geometry, generate_series(1, st_numgeometries(geometry))) as pnt, * 
                 from intersections
             )
-            select stream_name, strahler_order, stream_id, feature_name, 'ROAD', pnt 
+            select stream_name, strahler_order, stream_id, transport_feature_name, 'ROAD', pnt 
             from points
         );
         
@@ -145,13 +145,13 @@ def computeCrossings(connection):
         
         --trail
         INSERT INTO {dbTargetSchema}.{dbCrossingsTable} 
-            (stream_name, strahler_order, stream_id, feature_name, crossing_feature_type, geometry) 
+            (stream_name, strahler_order, stream_id, transport_feature_name, crossing_feature_type, geometry) 
         
         (       
             with intersections as (       
                 select st_intersection(a.geometry, b.geometry) as geometry,
                     a.id as stream_id, b.id as feature_id, 
-                    a.stream_name, a.strahler_order, b."name" as feature_name
+                    a.stream_name, a.strahler_order, b."name" as transport_feature_name
                 from {dbTargetSchema}.{dbTargetStreamTable}  a,
                      {appconfig.dataSchema}.{trailTable} b
                 where st_intersects(a.geometry, b.geometry)
@@ -160,7 +160,7 @@ def computeCrossings(connection):
                 select st_geometryn(geometry, generate_series(1, st_numgeometries(geometry))) as pnt, * 
                 from intersections
             )
-            select stream_name, strahler_order, stream_id, feature_name, 'TRAIL', pnt 
+            select stream_name, strahler_order, stream_id, transport_feature_name, 'TRAIL', pnt 
             from points
         );
         
@@ -177,7 +177,10 @@ def computeAttributes(connection):
     #https://github.com/egouge/cwf-alberta/issues/1
     
     query = f"""
-        
+        --set every crossing to crossing_status 'modelled'
+        UPDATE {dbTargetSchema}.{dbCrossingsTable}
+        SET crossing_status = 'MODELLED';
+
         UPDATE {dbTargetSchema}.{dbCrossingsTable}
         SET crossing_subtype = 'bridge',
           passability_status = 'PASSABLE'
@@ -185,14 +188,8 @@ def computeAttributes(connection):
         
         --set everything else to potential for now
         UPDATE {dbTargetSchema}.{dbCrossingsTable}
-        SET 
-          passability_status = 'POTENTIAL BARRIER'
+        SET passability_status = 'POTENTIAL BARRIER'
         WHERE passability_status is null;
-    
-        --set every crossing to crossing_status 'modelled'
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-        SET
-          crossing_status = 'MODELLED';
     """
     #print(query)
     with connection.cursor() as cursor:
@@ -203,13 +200,14 @@ def addToBarriers(connection):
     query = f"""
         INSERT INTO {dbTargetSchema}.{dbBarrierTable}(
             modelled_id, original_point, snapped_point, type,
-            crossing_subtype, passability_status, crossing_status
+            crossing_subtype, passability_status, crossing_status,
+            transport_feature_name
         )
         SELECT 
             modelled_id, geometry, geometry, 'modelled_crossing',
-            crossing_subtype, passability_status, crossing_status
-        FROM {dbTargetSchema}.{dbCrossingsTable}
-        WHERE passability_status = 'POTENTIAL BARRIER';
+            crossing_subtype, passability_status, crossing_status,
+            transport_feature_name
+        FROM {dbTargetSchema}.{dbCrossingsTable};
     """
     #print(query)
     with connection.cursor() as cursor:
@@ -230,10 +228,10 @@ def main():
         computeCrossings(conn)
 
         
-        print("  calculating modelled crossing attributes ")
+        print("  calculating modelled crossing attributes")
         computeAttributes(conn)
         
-        print("  add to barriers ")
+        print("  adding to barriers")
         addToBarriers(conn)
         
         conn.commit()

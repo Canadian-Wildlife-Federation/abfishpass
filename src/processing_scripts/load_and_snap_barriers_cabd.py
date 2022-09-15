@@ -62,6 +62,7 @@ def main():
                 stream_measure numeric,
                 wshed_name varchar,
                 wshed_priority varchar,
+                transport_feature_name varchar,
 
                 species_upstr varchar[],
                 species_downstr varchar[],
@@ -125,7 +126,7 @@ def main():
                 dam_use,
                 passability_status,
                 type)
-            VALUES (%s, ST_Transform(ST_GeomFromText('POINT(%s %s)',4617),{appconfig.dataSrid}), %s, %s, %s, %s, 'dam');
+            VALUES (%s, ST_Transform(ST_GeomFromText('POINT(%s %s)',4617),{appconfig.dataSrid}), %s, %s, %s, UPPER(%s), 'dam');
         """
         with conn.cursor() as cursor:
             for feature in output_data:
