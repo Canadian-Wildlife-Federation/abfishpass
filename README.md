@@ -253,7 +253,7 @@ compute_vertex_gradient.py
 
 This script breaks the stream network at "barriers" and recomputes necessary attributes. 
 
-For this script a barrier is considered to be: a cabd barrier (dam, waterfall), all modelled crossings, and the most downstream verticies with a gradient greater than minimum value specified in the fish_species table for the accessasbility_gradient field in a collection of verticies with gradient values larger than this value.
+For this script a barrier is considered to be: a cabd barrier (dam, waterfall), all modelled crossings, and the most downstream vertices with a gradient greater than minimum value specified in the fish_species table for the accessasbility_gradient field in a collection of vertices with gradient values larger than this value.
 
 For example if stream vertcies has these gradient classes:
 
@@ -267,7 +267,7 @@ x-----x------o------o------x------x-------x-------o---->
 1-----2------3------4------5------6-------7-------8---->
 
 
-Then the stream edge would be split at verticies 2 and 7.
+Then the stream edge would be split at vertices 2 and 7.
 
 **Script**
 
@@ -285,7 +285,7 @@ break_streams_at_barriers.py
   
 ---
 #### 9 - ReAssign Raw Z Value
-We recompute z values again based on the raw data so any added verticies and be computed based on the raw data and not interpolated points.
+We recompute z values again based on the raw data so any added vertices and be computed based on the raw data and not interpolated points.
 
 ---
 #### 10 - ReCompute Smoothed Z Value
@@ -309,7 +309,7 @@ compute_segment_gradient.py
 
 
 ---
-#### 12 - Load and snap file observations
+#### 12 - Load and snap fish observations
 
 Loads fish observation data provided and snaps it to the stream network. 
 
@@ -360,8 +360,8 @@ Computes an accessibility value for each fish species for each stream segment ba
 * fish survey and stocking information 
 
 Segments are classified as:
-* ACCESSIBILE - when all gradients downstream are less than maximum amount and there are no barriers downstream OR there is fish stocking or fish survey points upstream (for the given species)
-* POTENTIAL ACCESSIBLE - when all gradients downstream are less than the maximum amount but there is a barrier downstream
+* ACCESSIBLE - when all gradients downstream are less than maximum amount and there are no barriers downstream OR there is fish stocking or fish survey points upstream (for the given species)
+* POTENTIALLY ACCESSIBLE - when all gradients downstream are less than the maximum amount but there is a barrier downstream
 * NOT ACCESSIBLE - when any downstream gradient is greater than the maximum value
 
 Barriers include:
@@ -370,7 +370,7 @@ Barriers include:
 
 **Script**
 
-compute_gradient_accessbility.py
+compute_gradient_accessibility.py
 
 **Input Requirements**
 
@@ -475,7 +475,7 @@ The smoothing process ensures streams always flow down hill.
 
 Notes:
 *This algorithm does not contain any spike detection, so if there is an error in the DEM that causes a significant spike in the stream network this will significantly affect the results.
-* Nodes and verticies with no elevation values (NODATA), are ignored in the computation of the min/max values.
+* Nodes and vertices with no elevation values (NODATA), are ignored in the computation of the min/max values.
 
 
 1. Create a graph of the nodes in the stream network

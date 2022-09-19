@@ -75,7 +75,7 @@ def main():
         """
         with conn.cursor() as cursor:
             cursor.execute(query)
-        conn.commit();
+        conn.commit()
         
     print(f"""Initializing processing for watershed {workingWatershedId} complete.""")
 

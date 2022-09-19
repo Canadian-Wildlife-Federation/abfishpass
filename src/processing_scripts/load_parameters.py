@@ -124,6 +124,8 @@ with appconfig.connectdb() as conn:
             rear_channel_confinement_min,
             rear_channel_confinement_max
         FROM {sourceTable};
+
+        DROP TABLE {sourceTable};
         """
 
     with conn.cursor() as cursor:
