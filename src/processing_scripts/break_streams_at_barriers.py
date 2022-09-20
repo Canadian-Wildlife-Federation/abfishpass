@@ -229,9 +229,9 @@ def recomputeMainstreamMeasure(connection):
 def updateModelledCrossing(connection):
     
     query = f"""
-        ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN stream_measure;
-        
-        ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} RENAME COLUMN stream_id to stream_id_up;
+        ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS stream_measure;
+        ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS stream_id;
+        ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN IF NOT EXISTS stream_id_up uuid;
         
         UPDATE {dbTargetSchema}.{dbCrossingsTable} SET stream_id_up = null;
         
@@ -248,7 +248,9 @@ def updateModelledCrossing(connection):
             WHERE a.crossingid = {dbTargetSchema}.{dbCrossingsTable}.modelled_id;
             
             
-        ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN stream_id_down uuid;
+        ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN IF NOT EXISTS stream_id_down uuid;
+
+        UPDATE {dbTargetSchema}.{dbCrossingsTable} SET stream_id_down = null;
         
         WITH ids AS (
             SELECT a.id as stream_id, b.modelled_id as crossingid
