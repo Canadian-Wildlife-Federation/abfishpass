@@ -88,8 +88,8 @@ def createNetwork(connection):
         for feature in features:
             species.append(feature[0])
             accessibilitymodel = accessibilitymodel + ', ' + feature[0] + '_accessibility'
-            # TO DO: calculate separately for spawning and rearing - maybe chat with Emily
-            habitatmodel = habitatmodel + ', habitat_spawn_' + feature[0]
+            # TO DO: calculate separately for spawning and rearing - chat with Emily
+            habitatmodel = habitatmodel + ', habitat_spawn_' + feature[0] + ', habitat_rear_' + feature[0]
             
     
     
