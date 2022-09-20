@@ -49,7 +49,7 @@ def computeGradientModel(connection):
             mingradient = feature[2]
             maxgradient = feature[3]
             
-            print("       processing " + name + " - spawning")
+            print("       processing " + name)
             
             colname = "habitat_spawn_gradient_" + code
             
@@ -91,8 +91,6 @@ def computeGradientModel(connection):
             name = feature[1]
             mingradient = feature[2]
             maxgradient = feature[3]
-            
-            print("       processing " + name + " - rearing")
             
             colname = "habitat_rear_gradient_" + code
             
@@ -138,7 +136,7 @@ def computeDischargeModel(connection):
             minvelocity = feature[2]
             maxvelocity = feature[3]
             
-            print("       processing " + name + " - spawning")
+            print("       processing " + name)
             
             colname = "habitat_spawn_discharge_" + code
             
@@ -180,8 +178,6 @@ def computeDischargeModel(connection):
             name = feature[1]
             minvelocity = feature[2]
             maxvelocity = feature[3]
-            
-            print("       processing " + name + " - rearing")
             
             colname = "habitat_rear_discharge_" + code
             
@@ -227,7 +223,7 @@ def computeConfinementModel(connection):
             mincc = feature[2]
             maxcc = feature[3]
             
-            print("       processing " + name + " - spawning")
+            print("       processing " + name)
             
             colname = "habitat_spawn_channel_confinement_" + code
             
@@ -262,8 +258,6 @@ def computeConfinementModel(connection):
             name = feature[1]
             mincc = feature[2]
             maxcc = feature[3]
-            
-            print("       processing " + name + " - rearing")
             
             colname = "habitat_rear_channel_confinement_" + code
             
@@ -320,6 +314,11 @@ def computeHabitatModel(connection):
                 UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
                     SET {colname} = true
                     WHERE {gradient} = true AND {discharge} = true AND {chn_confine} = true;
+                
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable}
+                    DROP COLUMN {gradient},
+                    DROP COLUMN {discharge},
+                    DROP COLUMN {chn_confine};
             """
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
@@ -356,6 +355,11 @@ def computeHabitatModel(connection):
                 UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
                     SET {colname} = true
                     WHERE {gradient} = true AND {discharge} = true AND {chn_confine} = true;
+                
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable}
+                    DROP COLUMN {gradient},
+                    DROP COLUMN {discharge},
+                    DROP COLUMN {chn_confine};
             """
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
