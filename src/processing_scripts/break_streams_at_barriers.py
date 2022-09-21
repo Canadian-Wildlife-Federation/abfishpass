@@ -45,20 +45,23 @@ def breakstreams (conn):
     query = f"""
         DROP TABLE IF EXISTS {dbTargetSchema}.break_points;
             
-        CREATE TABLE {dbTargetSchema}.break_points(point geometry(POINT, {appconfig.dataSrid}));
+        CREATE TABLE {dbTargetSchema}.break_points(
+            point geometry(POINT, {appconfig.dataSrid}),
+            barrier_id uuid,
+            type varchar,
+            passability_status varchar
+            );
     
-        -- barriers
-        INSERT INTO {dbTargetSchema}.break_points(point) SELECT snapped_point FROM {dbTargetSchema}.{dbBarrierTable};
-            
-        -- modelled crossings
-        INSERT INTO {dbTargetSchema}.break_points(point) SELECT geometry FROM {dbTargetSchema}.{dbCrossingsTable};
-         
+        -- barriers (includes modelled crossings)
+        INSERT INTO {dbTargetSchema}.break_points(point, barrier_id, type, passability_status) 
+            SELECT snapped_point, id, type, passability_status
+            FROM {dbTargetSchema}.{dbBarrierTable};
     """
         
     #print(query)
     with conn.cursor() as cursor:
         cursor.execute(query)
-    conn.commit();
+    conn.commit()
         
     # break at gradient points
 
@@ -67,7 +70,7 @@ def breakstreams (conn):
         FROM {appconfig.dataSchema}.{appconfig.fishSpeciesTable}
     """
     
-    mingradient = -1;
+    mingradient = -1
     
     with conn.cursor() as cursor:
         cursor.execute(query)
@@ -126,10 +129,10 @@ def breakstreams (conn):
                 insert = True
             
             if insert:
-                # this is a point that is not the first point on a new mainsteam 
+                # this is a point that is not the first point on a new mainstem 
                 # has a gradient larger than required values
                 # and has a downstream gradient that is less than required values  
-                query = f"""INSERT INTO {dbTargetSchema}.break_points(point) values ('{point}');""" 
+                query = f"""INSERT INTO {dbTargetSchema}.break_points(point, barrier_id, type, passability_status) values ('{point}', gen_random_uuid(), 'gradient barrier', 'BARRIER');""" 
                 with conn.cursor() as cursor2:
                     cursor2.execute(query)
             lastmainstem = mainstem
@@ -138,7 +141,7 @@ def breakstreams (conn):
     #break streams at snapped points
     #todo: may want to ensure this doesn't create small stream segments - 
     #ensure barriers are not on top of each other
-    conn.commit();
+    conn.commit()
     print("breaking streams")
     
     query = f"""
@@ -198,7 +201,7 @@ def breakstreams (conn):
         
     with conn.cursor() as cursor:
         cursor.execute(query)
-    conn.commit();
+    conn.commit()
 
 def recomputeMainstreamMeasure(connection):
     

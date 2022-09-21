@@ -216,7 +216,7 @@ def main():
         
         conn.autocommit = False
         
-        print("Computing Gradient Accessability Per Species")
+        print("Computing Gradient Accessibility Per Species")
         print("  creating output column")
         #add a new geometry column for output removing existing one
         query = f"""
@@ -237,7 +237,7 @@ def main():
         print("  saving results")
         writeResults(conn)
         
-        print("  computing accessiblity per species")
+        print("  computing accessibility per species")
         computeAccessibility(conn)
         
     print("done")
