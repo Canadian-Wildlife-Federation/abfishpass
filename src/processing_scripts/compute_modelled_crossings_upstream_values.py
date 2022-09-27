@@ -253,6 +253,8 @@ def writeResults(connection):
         inserttablestr = inserttablestr + ",%s,%s,%s,%s,%s"
     
     query = f"""
+        DROP TABLE IF EXISTS {dbTargetSchema}.temp;
+        
         CREATE TABLE {dbTargetSchema}.temp (
             stream_id uuid
             {tablestr}

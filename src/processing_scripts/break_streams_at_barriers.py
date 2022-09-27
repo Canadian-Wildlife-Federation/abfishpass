@@ -132,7 +132,7 @@ def breakstreams (conn):
                 # this is a point that is not the first point on a new mainstem 
                 # has a gradient larger than required values
                 # and has a downstream gradient that is less than required values  
-                query = f"""INSERT INTO {dbTargetSchema}.break_points(point, barrier_id, type, passability_status) values ('{point}', gen_random_uuid(), 'gradient barrier', 'BARRIER');""" 
+                query = f"""INSERT INTO {dbTargetSchema}.break_points(point, barrier_id, type, passability_status) values ('{point}', gen_random_uuid(), 'gradient_barrier', 'BARRIER');""" 
                 with conn.cursor() as cursor2:
                     cursor2.execute(query)
             lastmainstem = mainstem
