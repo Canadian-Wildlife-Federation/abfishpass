@@ -360,13 +360,16 @@ Computes an accessibility value for each fish species for each stream segment ba
 * fish survey and stocking information 
 
 Segments are classified as:
-* ACCESSIBLE - when all gradients downstream are less than maximum amount and there are no barriers downstream OR there is fish stocking or fish survey points upstream (for the given species)
-* POTENTIALLY ACCESSIBLE - when all gradients downstream are less than the maximum amount but there is a barrier downstream
-* NOT ACCESSIBLE - when any downstream gradient is greater than the maximum value
+* ACCESSIBLE - when there are no gradient barriers downstream and there are no impassable barriers downstream 
+* POTENTIALLY ACCESSIBLE - when there are no gradient barriers downstream OR when there are gradient barriers downstream, but there are fish stocking or fish survey points (for the given species) on the segment or upstream
+* NOT ACCESSIBLE - when there are gradient barriers downstream and no fish stocking or fish survey points (for the given species) on the segment or upstream
 
 Barriers include:
-* CABD loaded barriers (dams, waterfalls)
-* modelled crossing on streams with strahler order < 6
+* CABD loaded barriers (dams) where passability status != 'PASSABLE'
+* Modelled or assessed crossings where passability status != 'PASSABLE'
+
+NOTE: The calculations for potentially accessible and not accessible are currently tailored for resident species. 
+If species of interest are not resident species, users can remove the consideration for fish stocking and fish survey points.
 
 **Script**
 

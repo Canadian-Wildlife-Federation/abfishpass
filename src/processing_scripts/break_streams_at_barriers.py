@@ -32,6 +32,7 @@ dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
 dbCrossingsTable = appconfig.config['MODELLED_CROSSINGS']['modelled_crossings_table']
 dbVertexTable = appconfig.config['GRADIENT_PROCESSING']['vertex_gradient_table']
+dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['smoothedgeometry_field']
 
 def breakstreams (conn):
         
@@ -191,10 +192,13 @@ def breakstreams (conn):
             a.{appconfig.streamTableDischargeField}, 
             mainstem_id, a.geometry
         FROM newstreamlines a;
+
+        CREATE INDEX smooth_geom_idx ON {dbTargetSchema}.{dbTargetStreamTable} USING gist({dbTargetGeom});
         
         DROP TABLE newstreamlines; 
     
         --DROP TABLE {dbTargetSchema}.break_points;
+    
     """
         
     #print(query)

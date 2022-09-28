@@ -415,6 +415,27 @@ def main():
             ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_survey_up varchar[];
             ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_survey_down varchar[];
             
+
+            --re-match stream ids in case streams have been regenerated or rebroken
+            with match as (
+            SELECT a.id as stream_id, b.id as pntid, st_linelocatepoint(a.geometry, b.snapped_point) as streammeasure
+            FROM {dbTargetSchema}.{dbTargetStreamTable} a, {dbTargetSchema}.{dbFishStockingTable} b
+            WHERE st_intersects(a.geometry, st_buffer(b.snapped_point, 0.0001))
+            )
+            UPDATE {dbTargetSchema}.{dbFishStockingTable}
+            SET stream_id = a.stream_id, stream_measure = a.streammeasure
+            FROM match a WHERE a.pntid = {dbTargetSchema}.{dbFishStockingTable}.id;
+
+            with match as (
+            SELECT a.id as stream_id, b.id as pntid, st_linelocatepoint(a.geometry, b.snapped_point) as streammeasure
+            FROM {dbTargetSchema}.{dbTargetStreamTable} a, {dbTargetSchema}.{dbFishSurveyTable} b
+            WHERE st_intersects(a.geometry, st_buffer(b.snapped_point, 0.0001))
+            )
+            UPDATE {dbTargetSchema}.{dbFishSurveyTable}
+            SET stream_id = a.stream_id, stream_measure = a.streammeasure
+            FROM match a WHERE a.pntid = {dbTargetSchema}.{dbFishSurveyTable}.id;
+
+            
             WITH fishcodes AS (
                 SELECT stream_id, array_agg(spec_code) as spec
                 FROM 
