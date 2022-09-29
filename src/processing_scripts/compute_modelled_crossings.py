@@ -28,8 +28,8 @@ iniSection = appconfig.args.args[0]
 dbTargetSchema = appconfig.config[iniSection]['output_schema']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
-dbCrossingsTable = appconfig.config['MODELLED_CROSSINGS']['modelled_crossings_table']
-orderBarrierLimit = appconfig.config['MODELLED_CROSSINGS']['strahler_order_barrier_limit']
+dbCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
+orderBarrierLimit = appconfig.config['CROSSINGS']['strahler_order_barrier_limit']
 
 roadTable = appconfig.config['CREATE_LOAD_SCRIPT']['road_table'];
 railTable = appconfig.config['CREATE_LOAD_SCRIPT']['rail_table'];

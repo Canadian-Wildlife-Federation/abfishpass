@@ -547,12 +547,7 @@ aquatic_habitat_table = table name for fish aquatic habitat data
 fish_stocking_table = table name for fish stocking data  
 fish_survey_table = table name for fish survey data  
   
-[CABD_DATABASE] - the barriers database for loading barrier data  
-host = CABD host name  
-port = CABD port  
-name = CABD database name  
-user = CABD username  
-password = CABD password  
+[CABD_DATABASE]
 buffer = this is the buffer distance to grab features - the units are in the working_srid so if its meters 200 is reasonable, if it's degrees something like 0.001 is reasonable  
 snap_distance = distance (in working srid units) for snapping point features #to the stream network (fish observation data, barrier data etc)  
   
@@ -566,12 +561,14 @@ trail_table = trail table name
 stream_table = stream table name 
 
 [WATERSHEDID 1] -> there will be one section for each watershed with a unique section name  
-watershed_id = watershed id to process  
+watershed_id = watershed id to process
+nhn_watershed_id = nhn watershed id to process
 output_schema = output schema name  
 fish_observation_data = zip file containing fish observation data  
 
 [WATERSHEDID 2] -> there will be one section for each watershed with a unique section name  
-watershed_id = watershed id to process  
+watershed_id = watershed id to process
+nhn_watershed_id = nhn watershed id to process
 output_schema = output schema name  
 fish_observation_data = zip file containing fish observation data  
   
@@ -591,13 +588,16 @@ segment_gradient_field = name of segment gradient field (in streams table)
 max_downstream_gradient_field = name of field for storing the maximum downstream segment gradient (in streams table)  
   
 [BARRIER_PROCESSING]  
-barrier_table = table for storing barriers  
+barrier_table = table for storing barriers
+gradient_barrier_table = table where gradient barriers are stored (type = gradient_barrier)
   
-[MODELLED_CROSSINGS]  
-modelled_crossings_table = table for storing modelled crossings  
-strahler_order_barrier_limit = all crossings on streams with strahler order less than this will be considered barriers and treated similar to dams/waterfalls for habitat modelling  
+[CROSSINGS]  
+modelled_crossings_table = table for storing modelled crossings
+assessed_crossings_table = table for storing assessed crossings
+crossings_table = table where assessed crossing data will be joined with modelled crossings
+strahler_order_barrier_limit = all crossings on streams with Strahler order less than this will be considered barriers and treated similar to dams/waterfalls for habitat modelling  
 
 [HABITAT_STATS]
 stats_table = this table will be created in the [DATABASE].data_schema schema and contain watershed statistics
 
-watershed_data_schemas=ws17010302,ws17010301 #this is the list of processing schemas to include in the stats the schemas must exist and data must be processed
+watershed_data_schemas=ws17010302,ws17010301 #this is the list of processing schemas to include in the stats table the schemas must exist and data must be processed

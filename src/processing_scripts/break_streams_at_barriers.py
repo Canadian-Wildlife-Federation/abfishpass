@@ -30,7 +30,7 @@ dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
-dbCrossingsTable = appconfig.config['MODELLED_CROSSINGS']['modelled_crossings_table']
+dbCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
 dbVertexTable = appconfig.config['GRADIENT_PROCESSING']['vertex_gradient_table']
 dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['smoothedgeometry_field']
 

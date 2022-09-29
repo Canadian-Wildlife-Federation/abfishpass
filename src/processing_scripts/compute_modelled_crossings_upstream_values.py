@@ -32,7 +32,7 @@ watershed_id = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
-dbCrossingsTable = appconfig.config['MODELLED_CROSSINGS']['modelled_crossings_table']
+dbCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
 
 edges = []
 nodes = dict()
