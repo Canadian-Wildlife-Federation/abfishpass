@@ -31,9 +31,9 @@ dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 dbCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
 orderBarrierLimit = appconfig.config['CROSSINGS']['strahler_order_barrier_limit']
 
-roadTable = appconfig.config['CREATE_LOAD_SCRIPT']['road_table'];
-railTable = appconfig.config['CREATE_LOAD_SCRIPT']['rail_table'];
-trailTable = appconfig.config['CREATE_LOAD_SCRIPT']['trail_table'];
+roadTable = appconfig.config['CREATE_LOAD_SCRIPT']['road_table']
+railTable = appconfig.config['CREATE_LOAD_SCRIPT']['rail_table']
+trailTable = appconfig.config['CREATE_LOAD_SCRIPT']['trail_table']
     
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 
@@ -194,6 +194,8 @@ def computeAttributes(connection):
     #print(query)
     with connection.cursor() as cursor:
         cursor.execute(query)
+
+# TO DO: find a good script to move addToBarriers function to
     
 def addToBarriers(connection):
         
