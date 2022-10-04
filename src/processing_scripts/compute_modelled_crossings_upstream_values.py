@@ -296,11 +296,11 @@ def writeResults(connection):
             UPDATE {dbTargetSchema}.{dbCrossingsTable} 
             SET total_upstr_pot_access_{fish} = a.total_upstr_pot_access_{fish} / 1000.0 
             FROM {dbTargetSchema}.temp a, {dbTargetSchema}.{dbTargetStreamTable} b 
-            WHERE a.stream_id = b.id AND 
+            WHERE a.stream_id = b.id AND
                   a.stream_id = {dbTargetSchema}.{dbCrossingsTable}.stream_id_up;
 
 
-            --all upstream habitat
+            --total upstream habitat
             ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS total_upstr_hab_spawn_{fish};
             ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN total_upstr_hab_spawn_{fish} numeric;
     

@@ -39,37 +39,90 @@ dbModelledCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_tab
 dbCrossingsTable = appconfig.config['CROSSINGS']['crossings_table']
 
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
+joinDistance = appconfig.config['CROSSINGS']['join_distance']
 
 def loadAssessmentData(connection):
         
         # create assessed crossings table
         query = f"""
             DROP TABLE IF EXISTS {dbTargetSchema}.{dbTargetTable};
-
-            --TO DO: create the target table format
+            
+            CREATE TABLE {dbTargetSchema}.{dbTargetTable} (
+                unique_id uuid default uuid_generate_v4(),
+                disp_num varchar,
+                stream_name varchar,
+                ownership_type varchar,
+                crossing_type varchar,
+                crossing_subtype varchar,
+                crossing_status varchar,
+                last_inspection date,
+                passability_status varchar,
+                habitat_quality varchar,
+                year_planned numeric,
+                year_complete numeric,
+                comments varchar
+            )
+            
         """
-        with conn.cursor() as cursor:
+        with connection.cursor() as cursor:
             cursor.execute(query)
-        conn.commit()
+        connection.commit()
 
         # load assessment data
         orgDb="dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost+"' port='"+appconfig.dbPort+"' user='"+appconfig.dbUser+"' password='"+ appconfig.dbPassword+"'"
 
-        pycmd = '"' + appconfig.ogr + '" -overwrite -f "PostgreSQL" PG:"' + orgDb + '" -t_srs EPSG:' + appconfig.dataSrid + ' -nln "' + dbTargetSchema + '.' + dbTempTable + '" -lco GEOMETRY_NAME=geometry "' + rawData + '" '
+        pycmd = '"' + appconfig.ogr + '" -overwrite -f "PostgreSQL" PG:"' + orgDb + '" -t_srs EPSG:' + appconfig.dataSrid + ' -nln "' + dbTargetSchema + '.' + dbTempTable + '" -lco GEOMETRY_NAME=geometry "' + rawData + '" -oo EMPTY_STRING_AS_NULL=YES'
         print(pycmd)
         subprocess.run(pycmd)
 
+        # TO DO: create new copy of predicted_points table where owner is 
+        # converted to ownership_type
         query = f"""
-            --TO DO: insert values from dbTempTable to dbTargetTable
+            INSERT INTO {dbTargetSchema}.{dbTargetTable} (
+                disp_num,
+                stream_name,
+                ownership_type,
+                crossing_type,
+                crossing_subtype,
+                crossing_status,
+                last_inspection,
+                passability_status,
+                habitat_quality,
+                year_planned,
+                year_complete,
+                comments
+                )
+            SELECT 
+                DISP_NUM,
+                StreamName,
+                OWNER,
+                CASE WHEN CrossingType ILIKE 'bridge%' THEN 'obs' ELSE NULL END,
+                CrossingType,
+                CASE WHEN inspected = 'YES' OR lastinspection IS NOT NULL THEN 'ASSESSED' ELSE NULL END,
+                lastinspection,
+                CASE WHEN fishpassage = 'No Concerns' THEN 'PASSABLE' ELSE 'BARRIER' END,
+                habitatquality,
+                CASE WHEN year_planned IS NOT NULL AND year_planned != -1 THEN year_planned ELSE NULL END,
+                CASE WHEN year_complete IS NOT NULL AND year_complete != -1 THEN year_complete ELSE NULL END,
+                comments
+            FROM {dbTargetSchema}.{dbTempTable};
 
+            UPDATE {dbTargetSchema}.{dbTargetTable}
+            SET crossing_subtype = 
+                CASE
+                WHEN crossing_subtype ILIKE 'bridge%' THEN 'bridge'
+                WHEN crossing_subtype ILIKE 'culvert%' THEN 'culvert'
+                WHEN crossing_subtype ILIKE 'ford%' THEN 'ford'
+                WHEN crossing_subtype IS NULL OR crossing_subtype = 'No crossing present' THEN NULL
+                ELSE 'other' END
         """
-        with conn.cursor() as cursor:
+        with connection.cursor() as cursor:
             cursor.execute(query)
-        conn.commit()
+        connection.commit()
 
-def joinAssessmentData(connection)
+# def joinAssessmentData(connection):
 
-def loadToBarriers(connection)
+# def loadToBarriers(connection):
 
 #--- main program ---
 def main():
@@ -83,11 +136,11 @@ def main():
         print("  loading assessment data")
         loadAssessmentData(conn)
         
-        print("  joining assessment points to modelled points")
-        joinAssessmentData(conn)
+        # print("  joining assessment points to modelled points")
+        # joinAssessmentData(conn)
         
-        print("  adding joined points to crossings and barriers tables")
-        loadToBarriers(conn)  
+        # print("  adding joined points to crossings and barriers tables")
+        # loadToBarriers(conn)  
         
     print("done")
     
