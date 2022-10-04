@@ -60,7 +60,8 @@ def loadAssessmentData(connection):
                 habitat_quality varchar,
                 year_planned numeric,
                 year_complete numeric,
-                comments varchar
+                comments varchar,
+                geometry geometry(POINT, {appconfig.dataSrid})
             )
             
         """
@@ -90,7 +91,8 @@ def loadAssessmentData(connection):
                 habitat_quality,
                 year_planned,
                 year_complete,
-                comments
+                comments,
+                geometry
                 )
             SELECT 
                 DISP_NUM,
@@ -104,7 +106,8 @@ def loadAssessmentData(connection):
                 habitatquality,
                 CASE WHEN year_planned IS NOT NULL AND year_planned != -1 THEN year_planned ELSE NULL END,
                 CASE WHEN year_complete IS NOT NULL AND year_complete != -1 THEN year_complete ELSE NULL END,
-                comments
+                comments,
+                geometry
             FROM {dbTargetSchema}.{dbTempTable};
 
             UPDATE {dbTargetSchema}.{dbTargetTable}
