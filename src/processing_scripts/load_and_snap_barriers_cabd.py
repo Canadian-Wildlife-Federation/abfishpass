@@ -114,8 +114,6 @@ def main():
             output_feature.append(feature["properties"]["dam_use"])
             output_feature.append(feature["properties"]["passability_status"])
             output_data.append(output_feature)
-        
-        print(output_data)
 
         insertquery = f"""
             INSERT INTO {dbTargetSchema}.{dbBarrierTable} (

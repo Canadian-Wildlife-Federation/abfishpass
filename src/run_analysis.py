@@ -26,6 +26,7 @@ import appconfig
 from processing_scripts import preprocess_watershed
 from processing_scripts import load_and_snap_barriers_cabd 
 from processing_scripts import compute_modelled_crossings
+from processing_scripts import load_assessment_data
 from processing_scripts import compute_mainstems
 from processing_scripts import assign_raw_z
 from processing_scripts import smooth_z
@@ -48,6 +49,7 @@ print ("Processing: " + workingWatershedId)
 preprocess_watershed.main()
 # load_and_snap_barriers_cabd.main()
 # compute_modelled_crossings.main()
+# load_assessment_data.main()
 compute_mainstems.main()
 assign_raw_z.main()
 smooth_z.main()
