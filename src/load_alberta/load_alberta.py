@@ -24,12 +24,14 @@ import appconfig
 import os
 
 
-streamTable = appconfig.config['DATABASE']['stream_table'];
-roadTable = appconfig.config['CREATE_LOAD_SCRIPT']['road_table'];
-railTable = appconfig.config['CREATE_LOAD_SCRIPT']['rail_table'];
-trailTable = appconfig.config['CREATE_LOAD_SCRIPT']['trail_table'];
+streamTable = appconfig.config['DATABASE']['stream_table']
+roadTable = appconfig.config['CREATE_LOAD_SCRIPT']['road_table']
+railTable = appconfig.config['CREATE_LOAD_SCRIPT']['rail_table']
+trailTable = appconfig.config['CREATE_LOAD_SCRIPT']['trail_table']
+huc8Table = appconfig.config['CREATE_LOAD_SCRIPT']['huc8_table']
 
 file = appconfig.config['CREATE_LOAD_SCRIPT']['raw_data']
+hucfile = appconfig.config['CREATE_LOAD_SCRIPT']['huc_data']
 temptable = appconfig.dataSchema + ".temp"
 
 with appconfig.connectdb() as conn:
@@ -173,5 +175,13 @@ with appconfig.connectdb() as conn:
     with conn.cursor() as cursor:
         cursor.execute(query)
     conn.commit()
+
+    print("Loading HUC 8 Watershed Boundaries")
+    layer = "HydrologicUnitCode8WatershedsOfAlberta"
+    datatable = appconfig.dataSchema + "." + huc8Table
+    orgDb="dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost+"' port='"+appconfig.dbPort+"' user='"+appconfig.dbUser+"' password='"+ appconfig.dbPassword+"'"
+    pycmd = '"' + appconfig.ogr + '" -overwrite -f "PostgreSQL" PG:"' + orgDb + '" -t_srs EPSG:' + appconfig.dataSrid + ' -nlt geometry -nln "' + datatable + '" -nlt CONVERT_TO_LINEAR -nlt PROMOTE_TO_MULTI -lco GEOMETRY_NAME=geometry "' + hucfile + '" ' + layer
+    #print(pycmd)
+    subprocess.run(pycmd)
 
 print("Loading Alberta dataset complete")

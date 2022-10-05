@@ -41,6 +41,7 @@ dbModelledCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_tab
 dbCrossingsTable = appconfig.config['CROSSINGS']['crossings_table']
 
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
+dbHuc8Table = appconfig.config['CREATE_LOAD_SCRIPT']['huc8_table']
 joinDistance = appconfig.config['CROSSINGS']['join_distance']
 
 def loadAssessmentData(connection):
@@ -252,6 +253,13 @@ def loadToBarriers(connection):
             crossing_subtype, habitat_quality,
             year_planned, year_complete, comments
         FROM {dbTargetSchema}.{dbCrossingsTable};
+
+        UPDATE {dbTargetSchema}.{dbBarrierTable} SET wshed_name = (SELECT name FROM {dataSchema}.{dbHuc8Table} WHERE huc_8 = '{dbWatershedId}');
+        UPDATE {dbTargetSchema}.{dbBarrierTable} SET wshed_priority = 
+            CASE
+            WHEN wshed_name = 'WILDHAY RIVER' THEN 1
+            WHEN wshed_name = 'BERLAND RIVER' THEN 2
+            ELSE NULL END;
 
     """
 
