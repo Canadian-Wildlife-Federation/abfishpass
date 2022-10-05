@@ -55,7 +55,7 @@ with appconfig.connectdb() as conn:
     #print(query)
     with conn.cursor() as cursor:
         cursor.execute(query)
-    conn.commit();
+    conn.commit()
 
     print("Loading Roads")
     layer = "roads"
@@ -74,13 +74,16 @@ with appconfig.connectdb() as conn:
     feature_type_date,globalid,update_date,st_geometryn(geometry, generate_series(1, st_numgeometries(geometry))) 
     FROM
     {temptable};
+
+    UPDATE {datatable} SET name = NULL WHERE length(trim(name)) = 0;
+    UPDATE {datatable} SET name = trim(name);
     
     DROP table {temptable};
     """
     #print(query)
     with conn.cursor() as cursor:
         cursor.execute(query)
-    conn.commit();
+    conn.commit()
     
     print("Loading Rail")
     layer = "rail"
@@ -103,7 +106,7 @@ with appconfig.connectdb() as conn:
     #print(query)
     with conn.cursor() as cursor:
         cursor.execute(query)        
-    conn.commit();
+    conn.commit()
 
     print("Loading Trails")
     layer = "trails"
@@ -159,6 +162,9 @@ with appconfig.connectdb() as conn:
     {temptable}
     WHERE st_numgeometries(geometry) = 0;
     
+    UPDATE {datatable} SET name = NULL WHERE length(trim(name)) = 0;
+    UPDATE {datatable} SET name = trim(name);
+
     DROP table {temptable};
 
     """
@@ -166,6 +172,6 @@ with appconfig.connectdb() as conn:
     #print(query)
     with conn.cursor() as cursor:
         cursor.execute(query)
-    conn.commit();
+    conn.commit()
 
 print("Loading Alberta dataset complete")
