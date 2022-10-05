@@ -28,7 +28,7 @@ iniSection = appconfig.args.args[0]
 dbTargetSchema = appconfig.config[iniSection]['output_schema']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
-dbCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
+dbModelledCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
 orderBarrierLimit = appconfig.config['CROSSINGS']['strahler_order_barrier_limit']
 
 roadTable = appconfig.config['CREATE_LOAD_SCRIPT']['road_table']
@@ -44,45 +44,43 @@ def createTable(connection):
     #are computed for those species
     
     query = f"""
-        DROP TABLE IF EXISTS {dbTargetSchema}.{dbCrossingsTable};
+        DROP TABLE IF EXISTS {dbTargetSchema}.{dbModelledCrossingsTable};
         
-        CREATE TABLE {dbTargetSchema}.{dbCrossingsTable} (
+        CREATE TABLE {dbTargetSchema}.{dbModelledCrossingsTable} (
             modelled_id uuid default uuid_generate_v4(),
-            assessment_id varchar,
-            disp_num varchar,
             stream_name varchar,
             strahler_order integer,
             stream_id uuid, 
-            stream_measure numeric,
-            wshed_name varchar,
-            wshed_priority varchar,
+            -- stream_measure numeric,
+            -- wshed_name varchar,
+            -- wshed_priority varchar,
             transport_feature_name varchar,
-            ownership_type varchar,
+            -- ownership_type varchar,
             
-            species_upstr varchar[],
-            species_downstr varchar[],
-            stock_upstr varchar[],
-            stock_downstr varchar[],
+            -- species_upstr varchar[],
+            -- species_downstr varchar[],
+            -- stock_upstr varchar[],
+            -- stock_downstr varchar[],
             
-            barriers_upstr varchar[],
-            barriers_downstr varchar[],
-            barrier_cnt_upstr integer,
-            barrier_cnt_downstr integer,
+            -- barriers_upstr varchar[],
+            -- barriers_downstr varchar[],
+            -- barrier_cnt_upstr integer,
+            -- barrier_cnt_downstr integer,
             
-            critical_habitat varchar[],
+            -- critical_habitat varchar[],
             
             passability_status varchar,
-            last_inspection date,
+            -- last_inspection date,
             
-            crossing_status varchar CHECK (crossing_status in ('MODELLED', 'ASSESSED', 'HABITAT_CONFIRMATION', 'DESIGN', 'REMEDIATED')),
+            crossing_status varchar,
             crossing_feature_type varchar CHECK (crossing_feature_type IN ('ROAD', 'RAIL', 'TRAIL')),
             crossing_type varchar,
             crossing_subtype varchar,
             
-            habitat_quality varchar,
-            year_planned integer,
-            year_complete integer,
-            comments varchar,
+            -- habitat_quality varchar,
+            -- year_planned integer,
+            -- year_complete integer,
+            -- comments varchar,
             
             geometry geometry(Point, {appconfig.dataSrid}),
             
@@ -100,7 +98,7 @@ def computeCrossings(connection):
         
     query = f"""
         --roads
-        INSERT INTO {dbTargetSchema}.{dbCrossingsTable} 
+        INSERT INTO {dbTargetSchema}.{dbModelledCrossingsTable} 
             (stream_name, strahler_order, stream_id, transport_feature_name, crossing_feature_type, geometry) 
         
         (       
@@ -123,7 +121,7 @@ def computeCrossings(connection):
         
         
         --rail
-        INSERT INTO {dbTargetSchema}.{dbCrossingsTable} 
+        INSERT INTO {dbTargetSchema}.{dbModelledCrossingsTable} 
             (stream_name, strahler_order, stream_id, crossing_feature_type, geometry) 
         
         (       
@@ -144,7 +142,7 @@ def computeCrossings(connection):
         );
         
         --trail
-        INSERT INTO {dbTargetSchema}.{dbCrossingsTable} 
+        INSERT INTO {dbTargetSchema}.{dbModelledCrossingsTable} 
             (stream_name, strahler_order, stream_id, transport_feature_name, crossing_feature_type, geometry) 
         
         (       
@@ -174,20 +172,21 @@ def computeAttributes(connection):
     
     #assign all modelled crossings on 6th order streams and above a 
     #crossing_subtype of 'bridge' and a passability_status of 'passable'
-    #https://github.com/egouge/cwf-alberta/issues/1
     
     query = f"""
         --set every crossing to crossing_status 'modelled'
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
+        UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
         SET crossing_status = 'MODELLED';
 
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-        SET crossing_subtype = 'bridge',
-          passability_status = 'PASSABLE'
+        UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
+        SET 
+            crossing_type = 'obs',
+            crossing_subtype = 'bridge',
+            passability_status = 'PASSABLE'
         WHERE strahler_order >= {orderBarrierLimit};
         
         --set everything else to potential for now
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
+        UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
         SET passability_status = 'POTENTIAL BARRIER'
         WHERE passability_status is null;
     """
@@ -195,7 +194,7 @@ def computeAttributes(connection):
     with connection.cursor() as cursor:
         cursor.execute(query)
 
-# TO DO: find a good script to move addToBarriers function to
+# TO DO: move addToBarriers function to load_assessment_data.py
     
 def addToBarriers(connection):
         
@@ -209,7 +208,7 @@ def addToBarriers(connection):
             modelled_id, geometry, geometry, 'modelled_crossing',
             crossing_subtype, passability_status, crossing_status,
             transport_feature_name
-        FROM {dbTargetSchema}.{dbCrossingsTable};
+        FROM {dbTargetSchema}.{dbModelledCrossingsTable};
     """
     #print(query)
     with connection.cursor() as cursor:
@@ -229,12 +228,11 @@ def main():
         print("  computing modelled crossings")
         computeCrossings(conn)
 
-        
         print("  calculating modelled crossing attributes")
         computeAttributes(conn)
         
-        print("  adding to barriers")
-        addToBarriers(conn)
+        # print("  adding to barriers")
+        # addToBarriers(conn)
         
         conn.commit()
                 
