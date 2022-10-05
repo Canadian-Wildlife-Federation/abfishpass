@@ -107,7 +107,7 @@ def loadAssessmentData(connection):
             CrossingType,
             CASE WHEN inspected = 'YES' OR lastinspection IS NOT NULL THEN 'ASSESSED' ELSE NULL END,
             lastinspection,
-            CASE WHEN fishpassage = 'No Concerns' THEN 'PASSABLE' ELSE 'BARRIER' END,
+            CASE WHEN fishpassage = 'No Concerns' THEN 'PASSABLE' WHEN fishpassage = 'Concerns' THEN 'BARRIER' ELSE 'POTENTIAL BARRIER' END,
             habitatquality,
             CASE WHEN year_planned IS NOT NULL AND year_planned != -1 THEN year_planned ELSE NULL END,
             CASE WHEN year_complete IS NOT NULL AND year_complete != -1 THEN year_complete ELSE NULL END,
@@ -122,7 +122,7 @@ def loadAssessmentData(connection):
             WHEN crossing_subtype ILIKE 'culvert%' THEN 'culvert'
             WHEN crossing_subtype ILIKE 'ford%' THEN 'ford'
             WHEN crossing_subtype IS NULL OR crossing_subtype = 'No crossing present' THEN NULL
-            ELSE 'other' END
+            ELSE 'other' END;
 
     """
     with connection.cursor() as cursor:
@@ -227,7 +227,37 @@ def joinAssessmentData(connection):
         cursor.execute(query)
     connection.commit()
 
-# def loadToBarriers(connection):
+def loadToBarriers(connection):
+
+    query = f"""
+        DELETE FROM {dbTargetSchema}.{dbBarrierTable} WHERE type = 'stream_crossing';
+        
+        INSERT INTO {dbTargetSchema}.{dbBarrierTable}(
+            modelled_id, assessment_id, snapped_point,
+            type, owner, passability_status, disp_num,
+            stream_name, strahler_order, stream_id, 
+            transport_feature_name, critical_habitat,
+            last_inspection, crossing_status,
+            crossing_feature_type, crossing_type,
+            crossing_subtype, habitat_quality,
+            year_planned, year_complete, comments
+        )
+        SELECT 
+            modelled_id, assessment_id, geometry,
+            'stream_crossing', ownership_type, passability_status, disp_num,
+            stream_name, strahler_order, stream_id, 
+            transport_feature_name, critical_habitat,
+            last_inspection, crossing_status,
+            crossing_feature_type, crossing_type,
+            crossing_subtype, habitat_quality,
+            year_planned, year_complete, comments
+        FROM {dbTargetSchema}.{dbCrossingsTable};
+
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+    connection.commit()
 
 #--- main program ---
 def main():
@@ -244,8 +274,8 @@ def main():
         print("  joining assessment points to modelled points")
         joinAssessmentData(conn)
         
-        # print("  adding joined points to crossings and barriers tables")
-        # loadToBarriers(conn)  
+        print("  adding joined points to crossings and barriers tables")
+        loadToBarriers(conn)  
         
     print("done")
     
