@@ -30,15 +30,15 @@ dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
-dbCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
+dbModelledCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
+dbCrossingsTable = appconfig.config['CROSSINGS']['crossings_table']
 dbVertexTable = appconfig.config['GRADIENT_PROCESSING']['vertex_gradient_table']
 dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['smoothedgeometry_field']
 
 def breakstreams (conn):
         
     #find all break points
-    # all modelled crossings
-    # all barriers (waterfalls, dams)
+    # all barriers regardless of passability status (dams, modelled crossings, and assessed crossings)
     # all gradient barriers (Vertex gradient > min fish gradient)
     #  -> these are a bit special as we only want to break once for
     #     a segment if vertex gradient continuously large 
@@ -53,7 +53,7 @@ def breakstreams (conn):
             passability_status varchar
             );
     
-        -- barriers (includes modelled crossings)
+        -- barriers
         INSERT INTO {dbTargetSchema}.break_points(point, barrier_id, type, passability_status) 
             SELECT snapped_point, id, type, passability_status
             FROM {dbTargetSchema}.{dbBarrierTable};
@@ -193,11 +193,10 @@ def breakstreams (conn):
             mainstem_id, a.geometry
         FROM newstreamlines a;
 
+        DROP INDEX IF EXISTS {dbTargetSchema}."smooth_geom_idx";
         CREATE INDEX smooth_geom_idx ON {dbTargetSchema}.{dbTargetStreamTable} USING gist({dbTargetGeom});
         
-        DROP TABLE newstreamlines; 
-    
-        --DROP TABLE {dbTargetSchema}.break_points;
+        DROP TABLE newstreamlines;
     
     """
         
@@ -233,45 +232,61 @@ def recomputeMainstreamMeasure(connection):
     with connection.cursor() as cursor:
         cursor.execute(query)
 
-def updateModelledCrossing(connection):
+def updateBarrier(connection):
     
     query = f"""
+        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS stream_measure;
+        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS stream_id;
+        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN IF NOT EXISTS stream_id_up uuid;
+        
+        UPDATE {dbTargetSchema}.{dbBarrierTable} SET stream_id_up = null;
+        
+        WITH ids AS (
+            SELECT a.id as stream_id, b.id as barrier_id
+            FROM {dbTargetSchema}.{dbTargetStreamTable} a,
+                {dbTargetSchema}.{dbBarrierTable} b
+            WHERE a.geometry && st_buffer(b.snapped_point, 0.0000001) and
+                st_intersects(st_endpoint(a.geometry), st_buffer(b.snapped_point, 0.0000001))
+        )
+        UPDATE {dbTargetSchema}.{dbBarrierTable}
+            SET stream_id_up = a.stream_id
+            FROM ids a
+            WHERE a.barrier_id = {dbTargetSchema}.{dbBarrierTable}.id;
+            
+        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN IF NOT EXISTS stream_id_down uuid;
+
+        UPDATE {dbTargetSchema}.{dbBarrierTable} SET stream_id_down = null;
+        
+        WITH ids AS (
+            SELECT a.id as stream_id, b.id as barrier_id
+            FROM {dbTargetSchema}.{dbTargetStreamTable} a,
+                {dbTargetSchema}.{dbBarrierTable} b
+            WHERE a.geometry && st_buffer(b.snapped_point, 0.0000001) and
+                st_intersects(st_startpoint(a.geometry), st_buffer(b.snapped_point, 0.0000001))
+        )
+        UPDATE {dbTargetSchema}.{dbBarrierTable}
+            SET stream_id_down = a.stream_id
+            FROM ids a
+            WHERE a.barrier_id = {dbTargetSchema}.{dbBarrierTable}.id;
+        
+        --update crossing table with same info for consistency
+        
+        ALTER TABLE {dbTargetSchema}.{dbModelledCrossingsTable} DROP COLUMN stream_id;
+
         ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS stream_measure;
         ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS stream_id;
         ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN IF NOT EXISTS stream_id_up uuid;
-        
-        UPDATE {dbTargetSchema}.{dbCrossingsTable} SET stream_id_up = null;
-        
-        WITH ids AS (
-            SELECT a.id as stream_id, b.modelled_id as crossingid
-            FROM {dbTargetSchema}.{dbTargetStreamTable} a,
-                {dbTargetSchema}.{dbCrossingsTable} b
-            WHERE a.geometry && st_buffer(b.geometry, 0.0000001) and
-                st_intersects(st_endpoint(a.geometry), st_buffer(b.geometry, 0.0000001))
-        )
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-            SET stream_id_up = a.stream_id
-            FROM ids a
-            WHERE a.crossingid = {dbTargetSchema}.{dbCrossingsTable}.modelled_id;
-            
-            
         ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN IF NOT EXISTS stream_id_down uuid;
-
+        UPDATE {dbTargetSchema}.{dbCrossingsTable} SET stream_id_up = null;
         UPDATE {dbTargetSchema}.{dbCrossingsTable} SET stream_id_down = null;
-        
-        WITH ids AS (
-            SELECT a.id as stream_id, b.modelled_id as crossingid
-            FROM {dbTargetSchema}.{dbTargetStreamTable} a,
-                {dbTargetSchema}.{dbCrossingsTable} b
-            WHERE a.geometry && st_buffer(b.geometry, 0.0000001) and
-                st_intersects(st_startpoint(a.geometry), st_buffer(b.geometry, 0.0000001))
-        )
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-            SET stream_id_down = a.stream_id
-            FROM ids a
-            WHERE a.crossingid = {dbTargetSchema}.{dbCrossingsTable}.modelled_id;
+
+        UPDATE {dbTargetSchema}.{dbCrossingsTable} AS a
+            SET 
+            stream_id_up = (SELECT stream_id_up FROM {dbTargetSchema}.{dbBarrierTable} AS b WHERE a.modelled_id = b.modelled_id),
+            stream_id_down = (SELECT stream_id_down FROM {dbTargetSchema}.{dbBarrierTable} AS b WHERE a.modelled_id = b.modelled_id);
+
     """
-    #load geometries and create a network
+    
     with connection.cursor() as cursor:
         cursor.execute(query)                    
                         
@@ -283,8 +298,8 @@ def main():
         print("    recomputing mainsteam measures")
         recomputeMainstreamMeasure(connection)
     
-        print("    updating modelled crossing edge references")
-        updateModelledCrossing(connection)
+        print("    updating barrier stream references")
+        updateBarrier(connection)
     
     print("Breaking stream complete.")
     

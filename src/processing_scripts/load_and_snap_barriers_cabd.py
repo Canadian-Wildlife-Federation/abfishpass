@@ -64,16 +64,6 @@ def main():
                 wshed_priority varchar,
                 transport_feature_name varchar,
 
-                species_upstr varchar[],
-                species_downstr varchar[],
-                stock_upstr varchar[],
-                stock_downstr varchar[],
-
-                barriers_upstr varchar[],
-                barriers_downstr varchar[],
-                barrier_cnt_upstr integer,
-                barrier_cnt_downstr integer,
-                
                 critical_habitat varchar[],
                 
                 last_inspection date,
@@ -86,6 +76,18 @@ def main():
                 year_planned integer,
                 year_complete integer,
                 comments varchar,
+
+                species_upstr varchar[],
+                species_downstr varchar[],
+                stock_upstr varchar[],
+                stock_downstr varchar[],
+
+                barriers_upstr varchar[],
+                barriers_downstr varchar[],
+                barrier_cnt_upstr integer,
+                barrier_cnt_downstr integer,
+                gradient_barrier_cnt_upstr integer,
+                gradient_barrier_cnt_downstr integer,
 
                 primary key (id)
             );
