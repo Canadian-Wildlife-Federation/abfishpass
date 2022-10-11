@@ -364,6 +364,39 @@ def computeHabitatModel(connection):
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
 
+    # general habitat
+    query = f"""
+        SELECT code, name
+        FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        features = cursor.fetchall()
+    
+        for feature in features:
+            code = feature[0]
+            name = feature[1]
+            
+            spawning = "habitat_spawn_" + code
+            rearing = "habitat_rear_" + code
+
+            colname = "habitat_" + code
+
+            query = f"""
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable}
+                    ADD COLUMN IF NOT EXISTS {colname} boolean;
+                
+                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                    SET {colname} = false;
+
+                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                    SET {colname} = CASE WHEN {spawning} = false AND {rearing} = false THEN false ELSE true END;
+            
+            """
+            with connection.cursor() as cursor2:
+                cursor2.execute(query)
+
 def main():                            
     #--- main program ---    
     with appconfig.connectdb() as conn:
