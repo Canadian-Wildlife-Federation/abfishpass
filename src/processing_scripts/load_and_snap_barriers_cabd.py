@@ -99,7 +99,7 @@ def main():
         conn.commit()
 
         # retrieve barrier data from CABD API
-        url = f"https://cabd-web.azurewebsites.net/cabd-api/features/dams?&filter=nhn_watershed_id:eq:{nhnWatershedId}"
+        url = f"https://cabd-web.azurewebsites.net/cabd-api/features/dams?&filter=nhn_watershed_id:eq:{nhnWatershedId}&filter=use_analysis:eq:true"
         response = urllib.request.urlopen(url)
         data = json.loads(response.read())
 
