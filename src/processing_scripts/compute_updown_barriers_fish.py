@@ -35,7 +35,6 @@ dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 dbGradientBarrierTable = appconfig.config['BARRIER_PROCESSING']['gradient_barrier_table']
-dbModelledCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
 
 dbFishStockingTable = appconfig.config['DATABASE']['fish_stocking_table']
 dbFishSurveyTable = appconfig.config['DATABASE']['fish_survey_table']
