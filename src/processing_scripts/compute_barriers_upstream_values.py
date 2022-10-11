@@ -32,7 +32,6 @@ watershed_id = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
-dbCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
 
 edges = []
 nodes = dict()
@@ -56,6 +55,7 @@ class Node:
    
 # TO DO: add a general 'habitat' calculation that non-additively
 # calculates total and functional spawning and rearing habitat
+# for all species (total_upstr_hab_spawn_all for example)
 class Edge:
     def __init__(self, fromnode, tonode, fid, length, ls):
         self.fromNode = fromnode
