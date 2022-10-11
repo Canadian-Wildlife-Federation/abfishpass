@@ -290,62 +290,62 @@ def writeResults(connection):
         
         query = f"""
             --upstream accessible
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS total_upstr_pot_access_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN total_upstr_pot_access_{fish} numeric;
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS total_upstr_pot_access_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_pot_access_{fish} numeric;
             
-            UPDATE {dbTargetSchema}.{dbCrossingsTable} 
+            UPDATE {dbTargetSchema}.{dbBarrierTable} 
             SET total_upstr_pot_access_{fish} = a.total_upstr_pot_access_{fish} / 1000.0 
             FROM {dbTargetSchema}.temp a, {dbTargetSchema}.{dbTargetStreamTable} b 
             WHERE a.stream_id = b.id AND
-                  a.stream_id = {dbTargetSchema}.{dbCrossingsTable}.stream_id_up;
+                  a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
 
 
             --total upstream habitat
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS total_upstr_hab_spawn_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN total_upstr_hab_spawn_{fish} numeric;
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS total_upstr_hab_spawn_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_hab_spawn_{fish} numeric;
     
-            UPDATE {dbTargetSchema}.{dbCrossingsTable} 
+            UPDATE {dbTargetSchema}.{dbBarrierTable} 
             SET total_upstr_hab_spawn_{fish} = a.total_upstr_hab_spawn_{fish} / 1000.0 
             FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
             WHERE a.stream_id = b.id AND 
-                a.stream_id = {dbTargetSchema}.{dbCrossingsTable}.stream_id_up;
+                a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
             
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS total_upstr_hab_rear_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN total_upstr_hab_rear_{fish} numeric;
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS total_upstr_hab_rear_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_hab_rear_{fish} numeric;
     
-            UPDATE {dbTargetSchema}.{dbCrossingsTable} 
+            UPDATE {dbTargetSchema}.{dbBarrierTable} 
             SET total_upstr_hab_rear_{fish} = a.total_upstr_hab_rear_{fish} / 1000.0 
             FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
             WHERE a.stream_id = b.id AND 
-                a.stream_id = {dbTargetSchema}.{dbCrossingsTable}.stream_id_up;
+                a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
             
             --TO DO: non-additively calculate total upstream habitat combined from spawning and rearing
             --see if we can use the values from {dbTargetSchema}.temp to do this
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS total_upstr_hab_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN total_upstr_hab_{fish} numeric;
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS total_upstr_hab_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_hab_{fish} numeric;
             
             --functional upstream habitat
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS func_upstr_hab_spawn_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN func_upstr_hab_spawn_{fish} numeric;
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS func_upstr_hab_spawn_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN func_upstr_hab_spawn_{fish} numeric;
     
-            UPDATE {dbTargetSchema}.{dbCrossingsTable} 
+            UPDATE {dbTargetSchema}.{dbBarrierTable} 
             SET func_upstr_hab_spawn_{fish} = a.func_upstr_hab_spawn_{fish} / 1000.0 
             FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
             WHERE a.stream_id = b.id AND 
-                a.stream_id = {dbTargetSchema}.{dbCrossingsTable}.stream_id_up;
+                a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
             
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS func_upstr_hab_rear_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN func_upstr_hab_rear_{fish} numeric;
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS func_upstr_hab_rear_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN func_upstr_hab_rear_{fish} numeric;
     
-            UPDATE {dbTargetSchema}.{dbCrossingsTable} 
+            UPDATE {dbTargetSchema}.{dbBarrierTable} 
             SET func_upstr_hab_rear_{fish} = a.func_upstr_hab_rear_{fish} / 1000.0 
             FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
             WHERE a.stream_id = b.id AND 
-                a.stream_id = {dbTargetSchema}.{dbCrossingsTable}.stream_id_up;
+                a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
 
             --TO DO: non-additively calculate functional upstream habitat combined from spawning and rearing
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS func_upstr_hab_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN func_upstr_hab_{fish} numeric;  
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS func_upstr_hab_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN func_upstr_hab_{fish} numeric;  
 
         """
         with connection.cursor() as cursor:
@@ -363,21 +363,21 @@ def writeResults(connection):
 def assignBarrierSpeciesCounts(connection):
     
     query = f"""
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
+        UPDATE {dbTargetSchema}.{dbBarrierTable}
         SET species_upstr = a.fish_survey_up,
             stock_upstr = a.fish_stock_up,
             barrier_cnt_upstr = a.barrier_up_cnt,
             barriers_upstr = a.barriers_up
         FROM {dbTargetSchema}.{dbTargetStreamTable} a
-        WHERE a.id =  {dbTargetSchema}.{dbCrossingsTable}.stream_id_up;
+        WHERE a.id =  {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
         
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
+        UPDATE {dbTargetSchema}.{dbBarrierTable}
         SET species_downstr = a.fish_survey_down,
             stock_downstr = a.fish_stock_down,
             barrier_cnt_downstr = a.barrier_down_cnt,
             barriers_downstr = a.barriers_down
         FROM {dbTargetSchema}.{dbTargetStreamTable} a
-        WHERE a.id =  {dbTargetSchema}.{dbCrossingsTable}.stream_id_down;
+        WHERE a.id =  {dbTargetSchema}.{dbBarrierTable}.stream_id_down;
         
     """
     with connection.cursor() as cursor:
