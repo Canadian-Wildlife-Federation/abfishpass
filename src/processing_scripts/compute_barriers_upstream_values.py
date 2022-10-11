@@ -17,7 +17,7 @@
 #----------------------------------------------------------------------------------
 
 #
-# This script computes modelled crossings attributes that
+# This script computes barrier attributes that
 # require stream network traversal (upstream length per habitat type)
 #
 
@@ -397,7 +397,7 @@ def main():
         
         conn.autocommit = False
         
-        print("Computing Habitat Models for Modelled Crossings")
+        print("Computing Habitat Models for Barriers")
         
         print("  assigning barrier and species counts")
         assignBarrierSpeciesCounts(conn)

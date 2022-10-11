@@ -271,7 +271,7 @@ def updateBarrier(connection):
         
         --update crossing table with same info for consistency
         
-        ALTER TABLE {dbTargetSchema}.{dbModelledCrossingsTable} DROP COLUMN stream_id;
+        ALTER TABLE {dbTargetSchema}.{dbModelledCrossingsTable} DROP COLUMN IF EXISTS stream_id;
 
         ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS stream_measure;
         ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS stream_id;

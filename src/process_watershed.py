@@ -37,7 +37,7 @@ from processing_scripts import load_and_snap_fishobservation
 from processing_scripts import compute_gradient_accessibility
 from processing_scripts import compute_updown_barriers_fish
 from processing_scripts import compute_habitat_models
-from processing_scripts import compute_modelled_crossings_upstream_values
+from processing_scripts import compute_barriers_upstream_values
 
 iniSection = appconfig.args.args[0]
 
@@ -63,6 +63,6 @@ compute_segment_gradient.main()
 compute_updown_barriers_fish.main()
 compute_gradient_accessibility.main()
 compute_habitat_models.main()
-compute_modelled_crossings_upstream_values.main()
+compute_barriers_upstream_values.main()
 
 print ("Processing Complete: " + workingWatershedId)
