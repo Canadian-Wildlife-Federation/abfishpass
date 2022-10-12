@@ -31,114 +31,268 @@ def main():
     print ("Computing Summary Statistics")
     
     sheds = appconfig.config['HABITAT_STATS']['watershed_data_schemas'].split(",")
-    
+
+    query = f"""
+        DROP TABLE IF EXISTS {appconfig.dataSchema}.{statTable};
+        
+        CREATE TABLE IF NOT EXISTS {appconfig.dataSchema}.{statTable}(
+            watershed_id varchar,
+            total_km numeric,
+            accessible_all_km numeric,
+            potentially_accessible_all_km numeric,
+            accessible_spawn_all_km numeric,
+            accessible_rear_all_km numeric,
+            accessible_habitat_all_km numeric,
+            total_spawn_all_km numeric,
+            total_rear_all_km numeric,
+            total_habitat_all_km numeric,
+            connectivity_status numeric
+        );
+    """
+    with appconfig.connectdb() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            connection.commit()
+
     alldataquery = None
     for shed in sheds:
-        if (alldataquery is not None):
-            alldataquery = alldataquery + " UNION "
-        else:
-            alldataquery = ''    
-        alldataquery = alldataquery + " SELECT * FROM " + shed + "." + wsStreamTable
-    
-    with appconfig.connectdb() as connection:
-
-        fishes = []
+        alldataquery = "SELECT * FROM " + shed + "." + wsStreamTable
+        watershedidquery = "SELECT DISTINCT watershed_id FROM (" + alldataquery + ") AS alldata"
         
-        query = f""" SELECT code FROM {appconfig.dataSchema}.{appconfig.fishSpeciesTable}"""
-        
-        with connection.cursor() as cursor:
-            cursor.execute(query)
+        with appconfig.connectdb() as connection:
             
-            for row in cursor.fetchall():
-                fishes.append(row[0])
-
-
-        accessquery = ''
-        allfishaccess = None
-        allfishhabitat = None
-        fishhabitat = ''
-        for fish in fishes:        
-            accessquery = f"""
-                {accessquery}                
-                INSERT INTO {appconfig.dataSchema}.{statTable}(stat, value)
-                SELECT '{fish} ' || {fish}_accessibility, sum(segment_length)
-                FROM ({alldataquery}) as alldata
-                GROUP BY {fish}_accessibility;
+            with connection.cursor() as cursor:
+                cursor.execute(watershedidquery)
+                row = cursor.fetchone()
+                watershed_id = row[0]
+            
+            query = f"""
+                INSERT INTO {appconfig.dataSchema}.{statTable} (watershed_id)
+                VALUES ({watershed_id});
             """
-            if (allfishaccess is None):
-                allfishaccess = ''
-            else:
-                allfishaccess = allfishaccess + " OR "
-            allfishaccess = allfishaccess + f"""{fish}_accessibility = '{appconfig.Accessibility.ACCESSIBLE.value}' """
+            with connection.cursor() as cursor:
+                cursor.execute(query)
+                connection.commit()
 
-            # TO DO: calculate separately for spawning and rearing PLUS all habitat for spawning and rearing (non-additive)
-            fishhabitat = f"""
-                {fishhabitat}                
+            fishes = []
+
+            query = f""" SELECT code FROM {appconfig.dataSchema}.{appconfig.fishSpeciesTable}"""
+            
+            with connection.cursor() as cursor:
+                cursor.execute(query)
+                
+                for row in cursor.fetchall():
+                    fishes.append(row[0])
+        
+            colquery = ''
+            accessquery = ''
+            allfishaccess = None
+            allfishpotentialaccess = None
+            allfishaccess_spawn = None
+            allfishaccess_rear = None
+            allfishaccess_habitat = None
+            allfishspawn = None
+            allfishrear = None
+            allfishhabitat = None
+            fishspawnhabitat = ''
+            fishrearhabitat = ''
+            fishhabitat = ''
+            for fish in fishes:        
+                
+                colquery = f"""
+                    {colquery}
+                    ALTER TABLE {appconfig.dataSchema}.{statTable}
+                    ADD COLUMN IF NOT EXISTS {fish}_accessible_spawn_km numeric,
+                    ADD COLUMN IF NOT EXISTS {fish}_potentially_accessible_spawn_km numeric,
+                    ADD COLUMN IF NOT EXISTS {fish}_accessible_rear_km numeric,
+                    ADD COLUMN IF NOT EXISTS {fish}_potentially_accessible_rear_km numeric,
+                    ADD COLUMN IF NOT EXISTS {fish}_total_spawn_km numeric,
+                    ADD COLUMN IF NOT EXISTS {fish}_total_rear_km numeric,
+                    ADD COLUMN IF NOT EXISTS {fish}_total_habitat_km numeric;
+                """
+                
+                accessquery = f"""
+                    {accessquery}            
+                    UPDATE {appconfig.dataSchema}.{statTable} SET {fish}_accessible_spawn_km =
+                    (SELECT sum(segment_length)
+                    FROM ({alldataquery}) as alldata
+                    WHERE alldata.{fish}_accessibility = '{appconfig.Accessibility.ACCESSIBLE.value}'
+                    AND alldata.habitat_spawn_{fish} = true)
+                    WHERE watershed_id = '{watershed_id}';
+
+                    UPDATE {appconfig.dataSchema}.{statTable} SET {fish}_potentially_accessible_spawn_km =
+                    (SELECT sum(segment_length)
+                    FROM ({alldataquery}) as alldata
+                    WHERE alldata.{fish}_accessibility = '{appconfig.Accessibility.POTENTIAL.value}'
+                    AND alldata.habitat_spawn_{fish} = true)
+                    WHERE watershed_id = '{watershed_id}';
+
+                    UPDATE {appconfig.dataSchema}.{statTable} SET {fish}_accessible_rear_km =
+                    (SELECT sum(segment_length)
+                    FROM ({alldataquery}) as alldata
+                    WHERE alldata.{fish}_accessibility = '{appconfig.Accessibility.ACCESSIBLE.value}'
+                    AND alldata.habitat_rear_{fish} = true)
+                    WHERE watershed_id = '{watershed_id}';
+
+                    UPDATE {appconfig.dataSchema}.{statTable} SET {fish}_potentially_accessible_rear_km =
+                    (SELECT sum(segment_length)
+                    FROM ({alldataquery}) as alldata
+                    WHERE alldata.{fish}_accessibility = '{appconfig.Accessibility.POTENTIAL.value}'
+                    AND alldata.habitat_rear_{fish} = true)
+                    WHERE watershed_id = '{watershed_id}';
+
+                """
+                if (allfishaccess is None):
+                    allfishaccess = ''
+                else:
+                    allfishaccess = allfishaccess + " OR "
+                allfishaccess = allfishaccess + f"""{fish}_accessibility = '{appconfig.Accessibility.ACCESSIBLE.value}' """
+
+                if (allfishpotentialaccess is None):
+                    allfishpotentialaccess = ''
+                else:
+                    allfishpotentialaccess = allfishpotentialaccess + " OR "
+                allfishpotentialaccess = allfishpotentialaccess + f"""{fish}_accessibility = '{appconfig.Accessibility.POTENTIAL.value}' """
+
+                
+                fishspawnhabitat = f"""
+                    {fishspawnhabitat}                
+                    WITH alldata AS ({alldataquery})
+                    UPDATE {appconfig.dataSchema}.{statTable} SET {fish}_total_spawn_km =
+                    (SELECT sum(segment_length) FROM alldata
+                    WHERE habitat_spawn_{fish} = true)
+                    WHERE watershed_id = '{watershed_id}';
+                """
+
+                fishrearhabitat = f"""
+                    {fishrearhabitat}                
+                    WITH alldata AS ({alldataquery})
+                    UPDATE {appconfig.dataSchema}.{statTable} SET {fish}_total_rear_km =
+                    (SELECT sum(segment_length) FROM alldata
+                    WHERE habitat_rear_{fish} = true)
+                    WHERE watershed_id = '{watershed_id}';
+                """
+
+                fishhabitat = f"""
+                    {fishhabitat}                
+                    WITH alldata AS ({alldataquery})
+                    UPDATE {appconfig.dataSchema}.{statTable} SET {fish}_total_habitat_km =
+                    (SELECT sum(segment_length) FROM alldata
+                    WHERE habitat_{fish} = true)
+                    WHERE watershed_id = '{watershed_id}';
+                """
+
+                if (allfishspawn is None):
+                    allfishspawn = ''
+                else:
+                    allfishspawn = allfishspawn + " OR "
+                allfishspawn = allfishspawn + f"""habitat_spawn_{fish} = true"""
+
+                if (allfishrear is None):
+                    allfishrear = ''
+                else:
+                    allfishrear = allfishrear + " OR "
+                allfishrear = allfishrear + f"""habitat_rear_{fish} = true"""
+
+                if (allfishhabitat is None):
+                    allfishhabitat = ''
+                else:
+                    allfishhabitat = allfishhabitat + " OR "
+                allfishhabitat = allfishhabitat + f"""habitat_{fish} = true"""
+
+            allfishaccess_spawn = f"""
                 WITH alldata AS ({alldataquery})
-                INSERT INTO {appconfig.dataSchema}.{statTable}(stat, value)
-                SELECT 
-                    CASE WHEN habitat_spawn_gradient_{fish} 
-                        AND habitat_spawn_discharge_{fish}
-                        AND habitat_spawn_channel_confinement_{fish}
-                    THEN  '{fish} fish habitat'
-                    ELSE '{fish} not fish habitat'
-                    END as ishabitat, sum(segment_length)
-                FROM alldata
-                GROUP BY ishabitat;
+                UPDATE {appconfig.dataSchema}.{statTable} SET accessible_spawn_all_km =
+                (SELECT sum(segment_length) FROM alldata
+                WHERE {allfishaccess} AND {allfishspawn})
+                WHERE watershed_id = '{watershed_id}';
             """
             
-            if (allfishhabitat is None):
-                allfishhabitat = ''
-            else:
-                allfishhabitat = allfishhabitat + " OR "
-            allfishhabitat = allfishhabitat + f"""(habitat_spawn_gradient_{fish} AND habitat_spawn_discharge_{fish} AND habitat_spawn_channel_confinement_{fish}) """
-            
-        allfishaccess = f"""
-            WITH alldata AS ({alldataquery})
-            INSERT INTO {appconfig.dataSchema}.{statTable}(stat, value)
-            SELECT 
-                CASE 
-                    WHEN {allfishaccess} 
-                    THEN  'all accessible' 
-                    ELSE 'all not accessible' 
-                    END as isaccess, sum(segment_length)
-            FROM alldata
-            GROUP BY isaccess;
-        """
-        
-        allfishhabitat = f"""
-        WITH alldata AS ({alldataquery})
-                INSERT INTO {appconfig.dataSchema}.{statTable}(stat, value)
-                SELECT 
-                    CASE WHEN {allfishhabitat}
-                    THEN  'any fish habitat'
-                    ELSE 'not any fish habitat'
-                    END as ishabitat, sum(segment_length)
-                FROM alldata
-                GROUP BY ishabitat;
-        """
-        
+            allfishaccess_rear = f"""
+                WITH alldata AS ({alldataquery})
+                UPDATE {appconfig.dataSchema}.{statTable} SET accessible_rear_all_km =
+                (SELECT sum(segment_length) FROM alldata
+                WHERE {allfishaccess} AND {allfishrear})
+                WHERE watershed_id = '{watershed_id}';
+            """
 
-        query = f"""
-            DROP TABLE IF EXISTS {appconfig.dataSchema}.{statTable};
+            allfishaccess_habitat = f"""
+                WITH alldata AS ({alldataquery})
+                UPDATE {appconfig.dataSchema}.{statTable} SET accessible_habitat_all_km =
+                (SELECT sum(segment_length) FROM alldata
+                WHERE {allfishaccess} AND {allfishhabitat})
+                WHERE watershed_id = '{watershed_id}';
+            """
+                
+            allfishaccess = f"""
+                WITH alldata AS ({alldataquery})
+                UPDATE {appconfig.dataSchema}.{statTable} SET accessible_all_km =
+                (SELECT sum(segment_length) FROM alldata
+                WHERE {allfishaccess})
+                WHERE watershed_id = '{watershed_id}';
+            """
+
+            allfishpotentialaccess = f"""
+                WITH alldata AS ({alldataquery})
+                UPDATE {appconfig.dataSchema}.{statTable} SET potentially_accessible_all_km =
+                (SELECT sum(segment_length) FROM alldata
+                WHERE {allfishpotentialaccess})
+                WHERE watershed_id = '{watershed_id}';
+            """
             
-            CREATE TABLE {appconfig.dataSchema}.{statTable}(
-                stat varchar,
-                value float
-            );
+            allfishspawn = f"""
+                WITH alldata AS ({alldataquery})
+                UPDATE {appconfig.dataSchema}.{statTable} SET total_spawn_all_km =
+                (SELECT sum(segment_length) from alldata WHERE {allfishspawn})
+                WHERE watershed_id = '{watershed_id}';
+            """
+
+            allfishrear = f"""
+                WITH alldata AS ({alldataquery})
+                UPDATE {appconfig.dataSchema}.{statTable} SET total_rear_all_km =
+                (SELECT sum(segment_length) from alldata WHERE {allfishrear})
+                WHERE watershed_id = '{watershed_id}';
+            """
+
+            allfishhabitat = f"""
+                WITH alldata AS ({alldataquery})
+                UPDATE {appconfig.dataSchema}.{statTable} SET total_habitat_all_km =
+                (SELECT sum(segment_length) from alldata WHERE {allfishhabitat})
+                WHERE watershed_id = '{watershed_id}';
+            """
+
+            connectivity_status = f"""        
+                UPDATE {appconfig.dataSchema}.{statTable} SET connectivity_status =
+                (SELECT (accessible_all_km / (accessible_all_km + potentially_accessible_all_km))
+                FROM {appconfig.dataSchema}.{statTable}
+                WHERE watershed_id = '{watershed_id}')
+                WHERE watershed_id = '{watershed_id}';
+            """
+
+            query = f"""
+                UPDATE {appconfig.dataSchema}.{statTable} SET total_km =
+                (SELECT sum(segment_length) FROM ({alldataquery}) as alldata)
+                WHERE watershed_id = '{watershed_id}';
+                
+                {colquery}
+                {accessquery}
+                {allfishaccess}
+                {allfishpotentialaccess}
+                {fishspawnhabitat}
+                {fishrearhabitat}
+                {fishhabitat}
+                {allfishaccess_spawn}
+                {allfishaccess_rear}
+                {allfishaccess_habitat}
+                {allfishspawn}
+                {allfishrear}
+                {allfishhabitat}
+                {connectivity_status}
+            """
             
-            INSERT INTO {appconfig.dataSchema}.{statTable}(stat, value)
-            SELECT 'Total Stream Length (km)', sum(segment_length) FROM ({alldataquery}) as alldata;
-            
-            {accessquery}
-            {allfishaccess}
-            {fishhabitat}
-            {allfishhabitat}
-        """
-        
-        #print (query)
-        with connection.cursor() as cursor:
-            cursor.execute(query)
+            # print(query)
+            with connection.cursor() as cursor:
+                cursor.execute(query)
     
     print ("Computing Summary Statistics Complete")
     
