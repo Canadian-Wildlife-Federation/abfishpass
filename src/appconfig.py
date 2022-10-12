@@ -30,6 +30,8 @@ configfile = "config.ini"
 
 parser = argparse.ArgumentParser(description='Process habitat modelling for watershed.')
 parser.add_argument('-c', type=str, help='the configuration file', required=False)
+parser.add_argument('-user', type=str, help='the username to access the database')
+parser.add_argument('-password', type=str, help='the password to access the database')
 parser.add_argument('args', type=str, nargs='*')
 args = parser.parse_args()
 if (args.c):
@@ -48,8 +50,8 @@ gdalsrsinfo = config['OGR']['gdalsrsinfo']
 dbHost = config['DATABASE']['host']
 dbPort = config['DATABASE']['port']
 dbName = config['DATABASE']['name']
-dbUser = config['DATABASE']['user']
-dbPassword = config['DATABASE']['password']
+dbUser = args.user
+dbPassword = args.password
 
 dataSchema = config['DATABASE']['data_schema']
 streamTable = config['DATABASE']['stream_table']
