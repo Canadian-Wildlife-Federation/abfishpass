@@ -29,8 +29,8 @@ dataFile = ""
 dataFile = sys.argv[1]
 sourceTable = appconfig.dataSchema + ".fish_species_raw"
 
-if len(sys.argv) != 2:
-    print("Invalid usage: py load_parameters.py <dataFile>")
+if len(sys.argv) != 8:
+    print("Invalid usage: py load_parameters.py <dataFile> -c config.ini -user <username> -password <password>")
     sys.exit()
 
 with appconfig.connectdb() as conn:
