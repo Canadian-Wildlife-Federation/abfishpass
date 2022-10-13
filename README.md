@@ -16,13 +16,13 @@ http://www.apache.org/licenses/LICENSE-2.0
 
 # Software Requirements
 * Python (tested with version 3.9.5)
-    * Modules: shapely, psycopg2, tifffile
+    * Modules: shapely, psycopg2, tifffile, requests
     
     
-* GDAL/ORG (comes installed with QGIS or can install standalone)
+* GDAL/OGR (comes installed with QGIS or can install standalone)
 
 
-* Postgresql/PostGIS database
+* PostgreSQL/PostGIS database
 
 
 
@@ -141,8 +141,8 @@ preprocess_watershed.py
 
 ---
 #### 2 - Loading Barriers
-This script loads waterfalls and dam barriers from the CABD database.
-
+This script loads dam barriers from the CABD API.
+By default, the script uses the nhn_watershed_id for the subject watershed(s) to retrieve features from the API.
 
 **Script**
 
@@ -150,12 +150,12 @@ load_and_snap_barriers_cabd.py
 
 **Input Requirements**
 
-* Access to the CABD database
+* Access to the CABD API
 * Streams table populated from the preprocessing step 
 
 **Output**
 
-* A new barrier table populated with dam and waterfall barriers from the CABD database
+* A new barrier table populated with dam barriers from the CABD API
 * The barrier table has two geometry fields - the raw field and a snapped field (the geometry snapped to the stream network). The maximum snapping distance is specified in the configuration file.
 
 ---
@@ -165,7 +165,7 @@ This script computes modelled crossings defined as locations where rail, road, o
 
 **Script**
 
-load_modelled_corssings.py
+load_modelled_crossings.py
 
 **Input Requirements**
 
@@ -253,7 +253,7 @@ compute_vertex_gradient.py
 
 This script breaks the stream network at "barriers" and recomputes necessary attributes. 
 
-For this script a barrier is considered to be: a cabd barrier (dam, waterfall), all modelled crossings, and the most downstream verticies with a gradient greater than minimum value specified in the fish_species table for the accessasbility_gradient field in a collection of verticies with gradient values larger than this value.
+For this script a barrier is considered to be: a cabd barrier (dam, waterfall), all modelled crossings, and the most downstream vertices with a gradient greater than minimum value specified in the fish_species table for the accessasbility_gradient field in a collection of vertices with gradient values larger than this value.
 
 For example if stream vertcies has these gradient classes:
 
@@ -267,7 +267,7 @@ x-----x------o------o------x------x-------x-------o---->
 1-----2------3------4------5------6-------7-------8---->
 
 
-Then the stream edge would be split at verticies 2 and 7.
+Then the stream edge would be split at vertices 2 and 7.
 
 **Script**
 
@@ -285,7 +285,7 @@ break_streams_at_barriers.py
   
 ---
 #### 9 - ReAssign Raw Z Value
-We recompute z values again based on the raw data so any added verticies and be computed based on the raw data and not interpolated points.
+We recompute z values again based on the raw data so any added vertices and be computed based on the raw data and not interpolated points.
 
 ---
 #### 10 - ReCompute Smoothed Z Value
@@ -309,7 +309,7 @@ compute_segment_gradient.py
 
 
 ---
-#### 12 - Load and snap file observations
+#### 12 - Load and snap fish observations
 
 Loads fish observation data provided and snaps it to the stream network. 
 
@@ -360,17 +360,20 @@ Computes an accessibility value for each fish species for each stream segment ba
 * fish survey and stocking information 
 
 Segments are classified as:
-* ACCESSIBILE - when all gradients downstream are less than maximum amount and there are no barriers downstream OR there is fish stocking or fish survey points upstream (for the given species)
-* POTENTIAL ACCESSIBLE - when all gradients downstream are less than the maximum amount but there is a barrier downstream
-* NOT ACCESSIBLE - when any downstream gradient is greater than the maximum value
+* ACCESSIBLE - when there are no gradient barriers downstream and there are no impassable barriers downstream 
+* POTENTIALLY ACCESSIBLE - when there are no gradient barriers downstream OR when there are gradient barriers downstream, but there are fish stocking or fish survey points (for the given species) on the segment or upstream
+* NOT ACCESSIBLE - when there are gradient barriers downstream and no fish stocking or fish survey points (for the given species) on the segment or upstream
 
 Barriers include:
-* CABD loaded barriers (dams, waterfalls)
-* modelled crossing on streams with strahler order < 6
+* CABD loaded barriers (dams) where passability status != 'PASSABLE'
+* Modelled or assessed crossings where passability status != 'PASSABLE'
+
+NOTE: The calculations for potentially accessible and not accessible are currently tailored for resident species. 
+If species of interest are not resident species, users can remove the consideration for fish stocking and fish survey points.
 
 **Script**
 
-compute_gradient_accessbility.py
+compute_gradient_accessibility.py
 
 **Input Requirements**
 
@@ -412,6 +415,10 @@ Computes a collection of modelled crossing statistics for each species and habit
  * total accessible upstream length - total length of streams that are accessible upstream of this point  
  * total upstream length - total upstream length with habitat model = true
  * functional upstream area - computed by walking up the stream network summing up length of stream segments with habitat model = true, stopping at the first barrier encountered (upstream)
+
+ **Script**
+
+compute_modelled_crossings_upstream_values.py
 
 **Input Requirements**
 * stream network
@@ -471,7 +478,7 @@ The smoothing process ensures streams always flow down hill.
 
 Notes:
 *This algorithm does not contain any spike detection, so if there is an error in the DEM that causes a significant spike in the stream network this will significantly affect the results.
-* Nodes and verticies with no elevation values (NODATA), are ignored in the computation of the min/max values.
+* Nodes and vertices with no elevation values (NODATA), are ignored in the computation of the min/max values.
 
 
 1. Create a graph of the nodes in the stream network
@@ -511,7 +518,7 @@ Notes:
 
 ## Mainstem Algorithm
 
-Mainstems are computed by starting at the sink node and walking up the network. At any confluence the mainsteam is push up the edge that:
+Mainstems are computed by starting at the sink node and walking up the network. At any confluence the mainstem is push up the edge that:
 1) has the same stream name as the current edge
 2) if no edges have the same name then any named edge; if there are multiple named edges it picks the edge with the longest path to a headwater
 3) if no named edges; then it  picks the edge with the longest path to a headwater.
@@ -540,12 +547,7 @@ aquatic_habitat_table = table name for fish aquatic habitat data
 fish_stocking_table = table name for fish stocking data  
 fish_survey_table = table name for fish survey data  
   
-[CABD_DATABASE] - the barriers database for loading barrier data  
-host = CABD host name  
-port = CABD port  
-name = CABD database name  
-user = CABD username  
-password = CABD password  
+[CABD_DATABASE]
 buffer = this is the buffer distance to grab features - the units are in the working_srid so if its meters 200 is reasonable, if it's degrees something like 0.001 is reasonable  
 snap_distance = distance (in working srid units) for snapping point features #to the stream network (fish observation data, barrier data etc)  
   
@@ -559,12 +561,14 @@ trail_table = trail table name
 stream_table = stream table name 
 
 [WATERSHEDID 1] -> there will be one section for each watershed with a unique section name  
-watershed_id = watershed id to process  
+watershed_id = watershed id to process
+nhn_watershed_id = nhn watershed id to process
 output_schema = output schema name  
 fish_observation_data = zip file containing fish observation data  
 
 [WATERSHEDID 2] -> there will be one section for each watershed with a unique section name  
-watershed_id = watershed id to process  
+watershed_id = watershed id to process
+nhn_watershed_id = nhn watershed id to process
 output_schema = output schema name  
 fish_observation_data = zip file containing fish observation data  
   
@@ -581,16 +585,19 @@ upstream_route_measure =name  upstream route measure field
 [GRADIENT_PROCESSING]  
 vertex_gradient_table = table for storing vertex gradient values   
 segment_gradient_field = name of segment gradient field (in streams table)  
-max_downstream_graident_field = name of field for storing the maximum downstream segment gradient (in streams table)  
+max_downstream_gradient_field = name of field for storing the maximum downstream segment gradient (in streams table)  
   
 [BARRIER_PROCESSING]  
-barrier_table = table for storing barriers  
+barrier_table = table for storing barriers
+gradient_barrier_table = table where gradient barriers are stored (type = gradient_barrier)
   
-[MODELLED_CROSSINGS]  
-modelled_crossings_table = table for storing modelled crossings  
-strahler_order_barrier_limit = all crossings on streams with strahler order less than this will be considered barriers and treated similar to dams/waterfalls for habitat modelling  
+[CROSSINGS]  
+modelled_crossings_table = table for storing modelled crossings
+assessed_crossings_table = table for storing assessed crossings
+crossings_table = table where assessed crossing data will be joined with modelled crossings
+strahler_order_barrier_limit = all crossings on streams with Strahler order less than this will be considered barriers and treated similar to dams/waterfalls for habitat modelling  
 
 [HABITAT_STATS]
 stats_table = this table will be created in the [DATABASE].data_schema schema and contain watershed statistics
 
-watershed_data_schemas=ws17010302,ws17010301 #this is the list of processing schemas to include in the stats the schemas must exist and data must be processed
+watershed_data_schemas=ws17010302,ws17010301 #this is the list of processing schemas to include in the stats table the schemas must exist and data must be processed

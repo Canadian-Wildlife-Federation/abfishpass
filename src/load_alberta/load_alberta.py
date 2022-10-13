@@ -24,12 +24,14 @@ import appconfig
 import os
 
 
-streamTable = appconfig.config['DATABASE']['stream_table'];
-roadTable = appconfig.config['CREATE_LOAD_SCRIPT']['road_table'];
-railTable = appconfig.config['CREATE_LOAD_SCRIPT']['rail_table'];
-trailTable = appconfig.config['CREATE_LOAD_SCRIPT']['trail_table'];
+streamTable = appconfig.config['DATABASE']['stream_table']
+roadTable = appconfig.config['CREATE_LOAD_SCRIPT']['road_table']
+railTable = appconfig.config['CREATE_LOAD_SCRIPT']['rail_table']
+trailTable = appconfig.config['CREATE_LOAD_SCRIPT']['trail_table']
+huc8Table = appconfig.config['CREATE_LOAD_SCRIPT']['huc8_table']
 
 file = appconfig.config['CREATE_LOAD_SCRIPT']['raw_data']
+hucfile = appconfig.config['CREATE_LOAD_SCRIPT']['huc_data']
 temptable = appconfig.dataSchema + ".temp"
 
 with appconfig.connectdb() as conn:
@@ -55,7 +57,7 @@ with appconfig.connectdb() as conn:
     #print(query)
     with conn.cursor() as cursor:
         cursor.execute(query)
-    conn.commit();
+    conn.commit()
 
     print("Loading Roads")
     layer = "roads"
@@ -74,13 +76,16 @@ with appconfig.connectdb() as conn:
     feature_type_date,globalid,update_date,st_geometryn(geometry, generate_series(1, st_numgeometries(geometry))) 
     FROM
     {temptable};
+
+    UPDATE {datatable} SET name = NULL WHERE length(trim(name)) = 0;
+    UPDATE {datatable} SET name = trim(name);
     
     DROP table {temptable};
     """
     #print(query)
     with conn.cursor() as cursor:
         cursor.execute(query)
-    conn.commit();
+    conn.commit()
     
     print("Loading Rail")
     layer = "rail"
@@ -103,7 +108,7 @@ with appconfig.connectdb() as conn:
     #print(query)
     with conn.cursor() as cursor:
         cursor.execute(query)        
-    conn.commit();
+    conn.commit()
 
     print("Loading Trails")
     layer = "trails"
@@ -159,6 +164,9 @@ with appconfig.connectdb() as conn:
     {temptable}
     WHERE st_numgeometries(geometry) = 0;
     
+    UPDATE {datatable} SET name = NULL WHERE length(trim(name)) = 0;
+    UPDATE {datatable} SET name = trim(name);
+
     DROP table {temptable};
 
     """
@@ -166,6 +174,14 @@ with appconfig.connectdb() as conn:
     #print(query)
     with conn.cursor() as cursor:
         cursor.execute(query)
-    conn.commit();
+    conn.commit()
+
+    print("Loading HUC 8 Watershed Boundaries")
+    layer = "HydrologicUnitCode8WatershedsOfAlberta"
+    datatable = appconfig.dataSchema + "." + huc8Table
+    orgDb="dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost+"' port='"+appconfig.dbPort+"' user='"+appconfig.dbUser+"' password='"+ appconfig.dbPassword+"'"
+    pycmd = '"' + appconfig.ogr + '" -overwrite -f "PostgreSQL" PG:"' + orgDb + '" -t_srs EPSG:' + appconfig.dataSrid + ' -nlt geometry -nln "' + datatable + '" -nlt CONVERT_TO_LINEAR -nlt PROMOTE_TO_MULTI -lco GEOMETRY_NAME=geometry "' + hucfile + '" ' + layer
+    #print(pycmd)
+    subprocess.run(pycmd)
 
 print("Loading Alberta dataset complete")

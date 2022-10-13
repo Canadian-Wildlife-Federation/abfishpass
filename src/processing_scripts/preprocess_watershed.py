@@ -32,6 +32,8 @@ def main():
         query = f"""
             CREATE SCHEMA IF NOT EXISTS {dbTargetSchema};
         
+            DROP TABLE IF EXISTS {dbTargetSchema}.{dbTargetStreamTable};
+
             CREATE TABLE IF NOT EXISTS {dbTargetSchema}.{dbTargetStreamTable}(
               {appconfig.dbIdField} uuid not null,
               source_id uuid not null,
@@ -42,8 +44,8 @@ def main():
               geometry geometry(LineString, {appconfig.dataSrid}),
               primary key ({appconfig.dbIdField})
             );
-        
-            CREATE INDEX {dbTargetSchema}_{dbTargetStreamTable}_geometry_idx ON  {dbTargetSchema}.{dbTargetStreamTable} using gist(geometry);
+            
+            CREATE INDEX {dbTargetSchema}_{dbTargetStreamTable}_geometry_idx ON {dbTargetSchema}.{dbTargetStreamTable} using gist(geometry);
             
             --ensure results are readable
             GRANT USAGE ON SCHEMA {dbTargetSchema} TO public;
@@ -73,7 +75,7 @@ def main():
         """
         with conn.cursor() as cursor:
             cursor.execute(query)
-        conn.commit();
+        conn.commit()
         
     print(f"""Initializing processing for watershed {workingWatershedId} complete.""")
 

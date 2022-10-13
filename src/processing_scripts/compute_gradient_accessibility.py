@@ -37,7 +37,7 @@ dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 dbMaxDownGradientField = appconfig.config['GRADIENT_PROCESSING']['max_downstream_gradient_field']
 dbSegmentGradientField = appconfig.config['GRADIENT_PROCESSING']['segment_gradient_field']
 
-
+# TO DO: remove network traversal section if this info is not needed
 edges = []
 nodes = dict()
 
@@ -61,10 +61,10 @@ class Node:
         
         minvalue = None;
         for edge in self.outedges:
-            if (edge.mindowngraident < 0 ): 
+            if (edge.mindowngradient < 0 ): 
                 return -1
-            elif (minvalue is None) or (edge.mindowngraident < minvalue):
-                minvalue = edge.mindowngraident
+            elif (minvalue is None) or (edge.mindowngradient < minvalue):
+                minvalue = edge.mindowngradient
         
         return minvalue;
     
@@ -76,7 +76,7 @@ class Edge:
         self.fid = fid
         self.visited = False
         self.maxgradient = maxgradient
-        self.mindowngraident = -1
+        self.mindowngradient = -1
 
         
 def createNetwork(connection):
@@ -142,7 +142,7 @@ def processNodes():
             continue;
         
         for edge in node.inedges:
-            edge.mindowngraident = max (edge.maxgradient, downg)
+            edge.mindowngradient = max (edge.maxgradient, downg)
             toprocess.append(edge.fromNode)
         
 
@@ -157,7 +157,7 @@ def writeResults(connection):
     newdata = []
     
     for edge in edges:
-        newdata.append( (edge.mindowngraident, edge.fid) )
+        newdata.append( (edge.mindowngradient, edge.fid) )
     
     with connection.cursor() as cursor:    
         psycopg2.extras.execute_batch(cursor, updatequery, newdata);
@@ -182,24 +182,32 @@ def computeAccessibility(connection):
             
             allcodes = feature[3]
             
-            fishop = ""
+            fishpt = []
+            nofishpt = []
+
             for fcode in allcodes:
-                fishop = fishop + "upper('" + fcode + "') like ANY (fish_stock || fish_survey || fish_stock_up || fish_survey_up) or " 
-                
-                
+                fish = "upper('" + fcode + "') LIKE ANY (fish_stock || fish_survey || fish_stock_up || fish_survey_up)"
+                nofish = "upper('" + fcode + "') NOT LIKE ANY (fish_stock || fish_survey || fish_stock_up || fish_survey_up)"
+                fishpt.append(fish)
+                nofishpt.append(nofish)
+            
+            fishpt = ' OR '.join(fishpt)
+            nofishpt = ' OR '.join(nofishpt)
+
             print("  processing " + name)
             
             query = f"""
             
-                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} drop column if exists {code}_accessibility;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS {code}_accessibility;
             
-                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} add column {code}_accessibility varchar;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN {code}_accessibility varchar;
                 
                 UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-                set {code}_accessibility = 
+                SET {code}_accessibility = 
                 CASE 
-                  WHEN {fishop} ({dbMaxDownGradientField} < {maxvalue} and barrier_down_cnt = 0) THEN '{appconfig.Accessibility.ACCESSIBLE.value}'
-                  WHEN {dbMaxDownGradientField} < {maxvalue} and barrier_down_cnt > 0 THEN '{appconfig.Accessibility.POTENTIAL.value}'
+                  WHEN (gradient_barrier_down_cnt = 0 and barrier_down_cnt = 0) THEN '{appconfig.Accessibility.ACCESSIBLE.value}'
+                  WHEN (gradient_barrier_down_cnt = 0 and barrier_down_cnt > 0) THEN '{appconfig.Accessibility.POTENTIAL.value}'
+                  WHEN (gradient_barrier_down_cnt > 0 AND {fishpt}) THEN '{appconfig.Accessibility.POTENTIAL.value}'
                   ELSE '{appconfig.Accessibility.NOT.value}' END;
                 
             """
@@ -216,7 +224,7 @@ def main():
         
         conn.autocommit = False
         
-        print("Computing Gradient Accessability Per Species")
+        print("Computing Gradient Accessibility Per Species")
         print("  creating output column")
         #add a new geometry column for output removing existing one
         query = f"""
@@ -237,7 +245,7 @@ def main():
         print("  saving results")
         writeResults(conn)
         
-        print("  computing accessiblity per species")
+        print("  computing accessibility per species")
         computeAccessibility(conn)
         
     print("done")
