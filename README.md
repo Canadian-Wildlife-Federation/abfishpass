@@ -518,7 +518,7 @@ Notes:
 
 ## Mainstem Algorithm
 
-Mainstems are computed by starting at the sink node and walking up the network. At any confluence the mainsteam is push up the edge that:
+Mainstems are computed by starting at the sink node and walking up the network. At any confluence the mainstem is push up the edge that:
 1) has the same stream name as the current edge
 2) if no edges have the same name then any named edge; if there are multiple named edges it picks the edge with the longest path to a headwater
 3) if no named edges; then it  picks the edge with the longest path to a headwater.

@@ -162,7 +162,13 @@ def computeCrossings(connection):
             from points
         );
         
-        
+        --delete any duplicate points within a very narrow tolerance
+        --duplicate points may result from transport features being broken on streams
+        DELETE FROM {dbTargetSchema}.{dbModelledCrossingsTable} p1
+        WHERE EXISTS (SELECT FROM {dbTargetSchema}.{dbModelledCrossingsTable} p2
+            WHERE p1.modelled_id > p2.modelled_id
+            AND ST_DWithin(p1.geometry,p2.geometry,0.01));
+
     """
     #print(query)
     with connection.cursor() as cursor:
@@ -194,26 +200,6 @@ def computeAttributes(connection):
     with connection.cursor() as cursor:
         cursor.execute(query)
 
-# TO DO: move addToBarriers function to load_assessment_data.py
-    
-def addToBarriers(connection):
-        
-    query = f"""
-        INSERT INTO {dbTargetSchema}.{dbBarrierTable}(
-            modelled_id, original_point, snapped_point, type,
-            crossing_subtype, passability_status, crossing_status,
-            transport_feature_name
-        )
-        SELECT 
-            modelled_id, geometry, geometry, 'modelled_crossing',
-            crossing_subtype, passability_status, crossing_status,
-            transport_feature_name
-        FROM {dbTargetSchema}.{dbModelledCrossingsTable};
-    """
-    #print(query)
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-
 def main():                        
     #--- main program ---    
     with appconfig.connectdb() as conn:
@@ -230,9 +216,6 @@ def main():
 
         print("  calculating modelled crossing attributes")
         computeAttributes(conn)
-        
-        # print("  adding to barriers")
-        # addToBarriers(conn)
         
         conn.commit()
                 

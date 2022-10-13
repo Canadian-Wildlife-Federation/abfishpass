@@ -295,7 +295,7 @@ def main():
         print("    breaking streams at barrier points")
         breakstreams(connection)
         
-        print("    recomputing mainsteam measures")
+        print("    recomputing mainstem measures")
         recomputeMainstreamMeasure(connection)
     
         print("    updating barrier stream references")
