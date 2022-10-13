@@ -49,8 +49,6 @@ def computeGradientModel(connection):
             mingradient = feature[2]
             maxgradient = feature[3]
             
-            print("       processing " + name)
-            
             colname = "habitat_spawn_gradient_" + code
             
             query = f"""
@@ -135,8 +133,6 @@ def computeDischargeModel(connection):
             name = feature[1]
             minvelocity = feature[2]
             maxvelocity = feature[3]
-            
-            print("       processing " + name)
             
             colname = "habitat_spawn_discharge_" + code
             
@@ -223,8 +219,6 @@ def computeConfinementModel(connection):
             mincc = feature[2]
             maxcc = feature[3]
             
-            print("       processing " + name)
-            
             colname = "habitat_spawn_channel_confinement_" + code
             
             query = f"""
@@ -276,10 +270,6 @@ def computeConfinementModel(connection):
             with connection.cursor() as cursor2:
                 cursor2.execute(query)
 
-# TO DO: add function to calculate general habitat suitability
-# for each species, after habitat parameters are broken out
-# into spawning and rearing
-
 def computeHabitatModel(connection):
 
     # spawning
@@ -302,7 +292,7 @@ def computeHabitatModel(connection):
 
             colname = "habitat_spawn_" + code
 
-            print("       processing " + name + " - spawning")
+            print("     processing " + name)
 
             query = f"""
                 ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable}
@@ -342,8 +332,6 @@ def computeHabitatModel(connection):
             chn_confine = "habitat_rear_channel_confinement_" + code
 
             colname = "habitat_rear_" + code
-
-            print("       processing " + name + " - rearing")
 
             query = f"""
                 ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable}
@@ -414,7 +402,7 @@ def main():
         print("  computing channel confinement models per species")
         computeConfinementModel(conn)
 
-        print(" computing spawning and rearing habitat models per species")
+        print("  computing spawning and rearing habitat models per species")
         computeHabitatModel(conn)
         
     print("done")
