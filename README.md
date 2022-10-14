@@ -45,17 +45,18 @@ All of the scripts allow for a custom configuration file to be specified by prov
 Data Processing takes part in three steps: load raw data, process each watershed, and compute summary statistics. If raw data has already been loaded for a watershed, you can run the analysis portions only using src/run_analysis.py.
 
 
-## 1 - Loading RAW Data
+## 1 - Loading Raw Data
 
 The first step is to populate the database with the required data. These load scripts are specific to the data provided for Alberta. Different source data will require modifications to these scripts.
 
 **Scripts**
 * load_alberta/create_db.py -> this script creates all the necessary database tables
-* load_alberta/load_alberta.py -> this script uses OGR to load the provided alberta data from the gdb file into the PostgreSQL database.
+* load_alberta/load_alberta.py -> this script uses OGR to load data for Alberta road, rail, trail, and stream networks from a gdb file into the PostgreSQL database.
 
 ### 1.1 - Configuring Fish Species Model Parameters
 
-As a part of the loading scripts a fish species table is created which contains the fish species of interest for modelling and various modelling parameters. Before processing the watershed these parameters should be reviewed and configured as necessary. 
+As a part of the loading scripts a fish species table is created which contains the fish species of interest for modelling and various modelling parameters. Before processing the watershed these parameters should be reviewed and configured as necessary.
+
 Note: Currently there is no velocity or channel confinement data. These parameters are placeholders for when this data is added. 
 
 **Main Script**
@@ -90,13 +91,13 @@ process_watershed.py -c config.ini [watershedid] -user [username] -password [pas
 
 The watershedid field must be specified as a section header in the config.ini file. The section must describe the watershed processing details for example:
 
-[17010301]
-#Berland: 17010301
-watershed_id = 17010301
-nhn_watershed_id = 07AC000
-output_schema = ws17010301
-fish_observation_data = C:\\temp\\BerlandExportFishInventoriesResults.zip
-assessment_data = C:\\temp\\berland.gpkg
+[17010301]  
+#Berland: 17010301  
+watershed_id = 17010301  
+nhn_watershed_id = 07AC000  
+output_schema = ws17010301  
+fish_observation_data = C:\temp\BerlandExportFishInventoriesResults.zip  
+assessment_data = C:\temp\berland.gpkg
 
 **Input Requirements**
 
@@ -105,7 +106,7 @@ assessment_data = C:\\temp\\berland.gpkg
 
 **Output**
 
-* A new schema with a streams table, barrier, modelled crossings and other output tables.
+* A new schema with a streams table, barrier, modelled crossings and other output tables.  
 **ALL EXISTING DATA IN THE OUTPUT TABLES WILL BE DELETED**
 
 
@@ -155,7 +156,7 @@ preprocess_watershed.py -c config.ini [watershedid] -user [username] -password [
 
 ---
 #### 2 - Loading Barriers
-This script loads dam barriers from the CABD API.
+This script loads dam barriers from the CABD API where use_analysis = true.  
 By default, the script uses the nhn_watershed_id from config.ini for the subject watershed(s) to retrieve features from the API.
 
 **Script**
@@ -193,7 +194,7 @@ load_and_snap_fishobservations.py -c config.ini [watershedid] -user [username] -
 
 ---
 #### 4 - Compute Modelled Crossings
-This script computes modelled crossings defined as locations where rail, road, or trails cross stream networks (based on feature geometries). Due to mapping errors these crossing may not actually exist on the ground.
+This script computes modelled crossings defined as locations where rail, road, or trails cross stream networks (based on feature geometries). Due to mapping errors, these crossings may not actually exist on the ground.
 
 
 **Script**
@@ -248,7 +249,7 @@ compute_mainstems.py -c config.ini [watershedid] -user [username] -password [pas
 
 **Output**
 
-* A new field, mainstem_id, downstream_route_measure and upstream_route_measure, added to the input table. At this point the measure fields are calculated in m
+* A new field, mainstem_id, downstream_route_measure and upstream_route_measure, added to the input table. The measure fields are calculated in km.
 
 
 ---
@@ -308,7 +309,8 @@ compute_vertex_gradient.py -c config.ini [watershedid] -user [username] -passwor
 
 This script breaks the stream network at barriers and recomputes necessary attributes. 
 
-For this script, a barrier is considered to be: a CABD barrier (dams), all stream crossings, and all gradient barriers (gradients greater than the minimum value specified in the accessibility_gradient field in the fish_species table). A list of gradient barriers can be found in the output break_points table (type = gradient_barrier). Streams are broken at all barriers regardless of passability status.
+For this script, a barrier is considered to be: a CABD barrier (dams), all stream crossings, and all gradient barriers (gradients greater than the minimum value specified in the accessibility_gradient field in the fish_species table).  
+A list of gradient barriers can be found in the output break_points table (type = gradient_barrier). Streams are broken at all barriers regardless of passability status.
 
 **Script**
 
@@ -455,13 +457,15 @@ compute_habitat_models.py -c config.ini [watershedid] -user [username] -password
 
 Computes a collection of barrier statistics including:
 
+Fish stocking, surveys, and barriers counts:
 * the fish species which were surveyed upstream and downstream
-* the fish species which are stocked upstream and downstream 
+* the fish species which are stocked upstream and downstream
 * number of upstream and downstream barriers
 * the identifiers of the upstream and downstream barriers
 * number of upstream and downstream gradient barriers
 
-* total potentially accessible upstream distance for each species
+Statistics by species:
+* total potentially accessible upstream distance for each species  
 * total upstream spawning habitat for each species
 * total upstream rearing habitat for each species
 * total upstream habitat (spawning or rearing) for each species
@@ -469,7 +473,8 @@ Computes a collection of barrier statistics including:
 * functional upstream rearing habitat for each species
 * functional upstream habitat (spawning or rearing) for each species
 
-* total upstream spawning habitat for any species
+Statistics for all species:
+* total upstream spawning habitat for any species  
 * total upstream rearing habitat for any species
 * total upstream habitat (spawning or rearing) for any species
 * functional upstream spawning habitat for any species
