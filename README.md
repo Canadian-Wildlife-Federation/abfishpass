@@ -39,6 +39,9 @@ All of the scripts allow for a custom configuration file to be specified by prov
 
 > prompt> create_db.py -c custom_config.ini
 
+The config.ini and appconfig.py files are included in the /src and /src/processing_scripts folders by default. If you want to run a script from another folder (e.g., src/load_alberta), you will need to make sure the config.ini and appconfig.py files are in that folder as well.   
+
+We recommend editing a single config.ini file with the configuration parameters you need, then copying this file to the other folders if you want to run individual scripts. 
 
 # Processing
 
@@ -52,6 +55,10 @@ The first step is to populate the database with the required data. These load sc
 **Scripts**
 * load_alberta/create_db.py -> this script creates all the necessary database tables
 * load_alberta/load_alberta.py -> this script uses OGR to load data for Alberta road, rail, trail, and stream networks from a gdb file into the PostgreSQL database.
+
+**Running the Scripts**  
+* create_db.py -c config.ini -user [username] -password [password]   
+* load_alberta.py -c config.ini -user [username] -password [password]
 
 ### 1.1 - Configuring Fish Species Model Parameters
 
@@ -102,7 +109,7 @@ assessment_data = C:\temp\berland.gpkg
 **Input Requirements**
 
 * Directory of tif images representing DEM files. All files should have the same projection and resolution.
-* A raw streams table with id (uuid), name (varchar), strhaler order (integer), watershed_id (varchar), and geometry (linestring) fields. The scripts assume this data is in an equal length projection so the st_length2d(geometry) function returns the length in metres. 
+* A raw streams table with id (uuid), name (varchar), strahler order (integer), watershed_id (varchar), and geometry (linestring) fields. The scripts assume this data is in an equal length projection so the st_length2d(geometry) function returns the length in metres. 
 
 **Output**
 
