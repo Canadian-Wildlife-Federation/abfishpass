@@ -126,7 +126,7 @@ with appconfig.connectdb() as conn:
     timerestriction1_end,timerestriction2_start,timerestriction2_end,timerestriction3_start,
     timerestriction3_end,spatialrestriction1,spatialrestriction2,trail_condition,trail_report_date,
     condition_source,comments,datasource,disposition_number,dateupdate,updateby,datasourcedate,
-    link,data_display,level_develop,use_type2,picture,geometry
+    link,data_display,level_develop,use_type2,geometry
     ) 
     SELECT uuid_generate_v4(), 
     name,trailid,type,status,season,designation,surface,use_type,accessibility,
@@ -136,7 +136,7 @@ with appconfig.connectdb() as conn:
     timerestriction1_end,timerestriction2_start,timerestriction2_end,timerestriction3_start,
     timerestriction3_end,spatialrestriction1,spatialrestriction2,trailcondition,trailreportdate,
     conditionsource,comments,datasource,dispositionnum,dateupdate,updateby,datasourcedate,
-    link,datadisplay,leveldevelop,usetype,picture,st_geometryn(geometry, generate_series(1, st_numgeometries(geometry))) 
+    link,datadisplay,leveldevelop,usetype,st_geometryn(geometry, generate_series(1, st_numgeometries(geometry))) 
     FROM
     {temptable};
     
@@ -149,7 +149,7 @@ with appconfig.connectdb() as conn:
     timerestriction1_end,timerestriction2_start,timerestriction2_end,timerestriction3_start,
     timerestriction3_end,spatialrestriction1,spatialrestriction2,trail_condition,trail_report_date,
     condition_source,comments,datasource,disposition_number,dateupdate,updateby,datasourcedate,
-    link,data_display,level_develop,use_type2,picture,geometry
+    link,data_display,level_develop,use_type2,geometry
     ) 
     SELECT uuid_generate_v4(), 
     name,trailid,type,status,season,designation,surface,use_type,accessibility,
@@ -159,7 +159,7 @@ with appconfig.connectdb() as conn:
     timerestriction1_end,timerestriction2_start,timerestriction2_end,timerestriction3_start,
     timerestriction3_end,spatialrestriction1,spatialrestriction2,trailcondition,trailreportdate,
     conditionsource,comments,datasource,dispositionnum,dateupdate,updateby,datasourcedate,
-    link,datadisplay,leveldevelop,usetype,picture, st_setsrid('LINESTRING EMPTY'::geometry,{appconfig.dataSrid}) 
+    link,datadisplay,leveldevelop,usetype,st_setsrid('LINESTRING EMPTY'::geometry,{appconfig.dataSrid}) 
     FROM
     {temptable}
     WHERE st_numgeometries(geometry) = 0;
