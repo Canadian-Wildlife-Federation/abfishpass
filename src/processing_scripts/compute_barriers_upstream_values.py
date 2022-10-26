@@ -542,11 +542,11 @@ def writeResults(connection):
     with connection.cursor() as cursor:
         cursor.execute(query)
 
-    # query = f"""
-    #     DROP TABLE {dbTargetSchema}.temp;
-    # """
-    # with connection.cursor() as cursor:
-    #     cursor.execute(query)             
+    query = f"""
+        DROP TABLE {dbTargetSchema}.temp;
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query)        
 
     connection.commit()
 
@@ -601,8 +601,6 @@ def main():
             
         print("  writing results")
         writeResults(conn)
-        
-        
         
     print("done")
     

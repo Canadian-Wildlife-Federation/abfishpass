@@ -45,6 +45,8 @@ with appconfig.connectdb() as conn:
     subprocess.run(pycmd)
     
     query = f"""
+    TRUNCATE TABLE {datatable};
+
     INSERT INTO {datatable} (id, waterbody_id, stream_name, feature_type, strahler_order, 
     watershed_id, hydro_code, fish_species, geometry) 
     SELECT uuid_generate_v4(), wb_id, name, feature_type, str_order::integer,
@@ -54,7 +56,7 @@ with appconfig.connectdb() as conn:
     
     DROP table {temptable};
     """
-    #print(query)
+    
     with conn.cursor() as cursor:
         cursor.execute(query)
     conn.commit()
@@ -68,6 +70,8 @@ with appconfig.connectdb() as conn:
     subprocess.run(pycmd)
     
     query = f"""
+    TRUNCATE TABLE {datatable};
+
     INSERT INTO {datatable} (
     id, feature_type, name, highway_number, road_class, geo_source, geo_date, feature_type_source,
     feature_type_date,globalid,update_date,geometry)         
@@ -82,7 +86,7 @@ with appconfig.connectdb() as conn:
     
     DROP table {temptable};
     """
-    #print(query)
+    
     with conn.cursor() as cursor:
         cursor.execute(query)
     conn.commit()
@@ -96,6 +100,8 @@ with appconfig.connectdb() as conn:
     subprocess.run(pycmd)
     
     query = f"""
+    TRUNCATE TABLE {datatable};
+
     INSERT INTO {datatable} (id, feature_type, geo_source, geo_date, 
     feature_type_source, feature_type_date, globalid, update_date, geometry) 
     SELECT uuid_generate_v4(), feature_type, geo_source, geo_date, 
@@ -105,7 +111,7 @@ with appconfig.connectdb() as conn:
     
     DROP table {temptable};
     """
-    #print(query)
+
     with conn.cursor() as cursor:
         cursor.execute(query)        
     conn.commit()
@@ -118,6 +124,8 @@ with appconfig.connectdb() as conn:
     #print(pycmd)
     subprocess.run(pycmd)
     query = f"""
+    TRUNCATE TABLE {datatable};
+
     INSERT INTO {datatable} (
     id,name,trailid,type,status,season,designation,surface,use_type,accessibility,
     commercial_operator,adopted,land_ownership,average_width,minimum_clearing_width,
@@ -138,7 +146,8 @@ with appconfig.connectdb() as conn:
     conditionsource,comments,datasource,dispositionnum,dateupdate,updateby,datasourcedate,
     link,datadisplay,leveldevelop,usetype,st_geometryn(geometry, generate_series(1, st_numgeometries(geometry))) 
     FROM
-    {temptable};
+    {temptable}
+    WHERE st_numgeometries(geometry) <> 0;
     
     --data without geometries
     INSERT INTO {datatable} (
@@ -171,7 +180,6 @@ with appconfig.connectdb() as conn:
 
     """
     
-    #print(query)
     with conn.cursor() as cursor:
         cursor.execute(query)
     conn.commit()
