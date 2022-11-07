@@ -303,7 +303,8 @@ def computeHabitatModel(connection):
 
                 UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
                     SET {colname} = true
-                    WHERE {gradient} = true AND {discharge} = true AND {chn_confine} = true;
+                    WHERE {gradient} = true AND {discharge} = true AND {chn_confine} = true
+                    AND strahler_order <> 1;
                 
                 ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable}
                     DROP COLUMN {gradient},
@@ -342,7 +343,8 @@ def computeHabitatModel(connection):
 
                 UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
                     SET {colname} = true
-                    WHERE {gradient} = true AND {discharge} = true AND {chn_confine} = true;
+                    WHERE {gradient} = true AND {discharge} = true AND {chn_confine} = true
+                    AND strahler_order <> 1;
                 
                 ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable}
                     DROP COLUMN {gradient},

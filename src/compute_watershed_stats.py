@@ -43,6 +43,7 @@ def main():
             accessible_spawn_all_km numeric,
             accessible_rear_all_km numeric,
             accessible_habitat_all_km numeric,
+            potentially_accessible_habitat_all_km numeric,
             total_spawn_all_km numeric,
             total_rear_all_km numeric,
             total_habitat_all_km numeric,
@@ -97,6 +98,7 @@ def main():
             allfishspawn_query = ''
             allfishrear_query = ''
             allfishhabitat_query = ''
+            allfishpotentialaccesshabitat_query = ''
 
             allfishaccess = None
             allfishpotentialaccess = None
@@ -106,6 +108,7 @@ def main():
             allfishspawn = None
             allfishrear = None
             allfishhabitat = None
+            allfishpotentialaccesshabitat = None
 
             for fish in fishes: 
                 
@@ -181,7 +184,13 @@ def main():
                 else:
                     allfishaccesshabitat = allfishaccesshabitat + " OR "
                 allfishaccesshabitat = allfishaccesshabitat + f"""({fish}_accessibility = '{appconfig.Accessibility.ACCESSIBLE.value}' AND habitat_{fish} = true)"""
-                
+
+                if (allfishpotentialaccesshabitat is None):
+                    allfishpotentialaccesshabitat = ''
+                else:
+                    allfishpotentialaccesshabitat = allfishpotentialaccesshabitat + " OR "
+                allfishpotentialaccesshabitat = allfishpotentialaccesshabitat + f"""({fish}_accessibility = '{appconfig.Accessibility.POTENTIAL.value}' AND habitat_{fish} = true)"""
+
                 fishspawnhabitat_query = f"""
                     {fishspawnhabitat_query}                
                     WITH alldata AS ({alldataquery})
@@ -288,9 +297,16 @@ def main():
                 WHERE watershed_id = '{watershed_id}';
             """
 
+            allfishpotentialaccesshabitat_query = f"""
+                WITH alldata AS ({alldataquery})
+                UPDATE {appconfig.dataSchema}.{statTable} SET potentially_accessible_habitat_all_km =
+                (SELECT sum(segment_length) from alldata WHERE {allfishpotentialaccesshabitat})
+                WHERE watershed_id = '{watershed_id}';
+            """
+
             connectivity_status_query = f"""        
                 UPDATE {appconfig.dataSchema}.{statTable} SET connectivity_status =
-                (SELECT (accessible_all_km / (accessible_all_km + potentially_accessible_all_km))
+                (SELECT (accessible_habitat_all_km / (accessible_habitat_all_km + potentially_accessible_habitat_all_km))
                 FROM {appconfig.dataSchema}.{statTable}
                 WHERE watershed_id = '{watershed_id}')
                 WHERE watershed_id = '{watershed_id}';
@@ -314,6 +330,7 @@ def main():
                 {allfishspawn_query}
                 {allfishrear_query}
                 {allfishhabitat_query}
+                {allfishpotentialaccesshabitat_query}
                 {connectivity_status_query}
             """
             
@@ -326,5 +343,3 @@ def main():
     
 if __name__ == "__main__":
     main()     
-
-
