@@ -92,7 +92,6 @@ def main():
                 primary key (id)
             );
             
-            delete from {dbTargetSchema}.{dbBarrierTable} where cabd_id is not null; 
         """
         with conn.cursor() as cursor:
             cursor.execute(query)
@@ -127,6 +126,8 @@ def main():
                 passability_status,
                 type)
             VALUES (%s, ST_Transform(ST_GeomFromText('POINT(%s %s)',4617),{appconfig.dataSrid}), %s, %s, %s, UPPER(%s), 'dam');
+
+            UPDATE {dbTargetSchema}.{dbBarrierTable} SET id = cabd_id WHERE type = 'dam';
         """
         with conn.cursor() as cursor:
             for feature in output_data:
