@@ -47,7 +47,9 @@ def main():
             total_spawn_all_km numeric,
             total_rear_all_km numeric,
             total_habitat_all_km numeric,
-            connectivity_status numeric
+            connectivity_status numeric,
+
+            primary key (watershed_id)
         );
     """
     with appconfig.connectdb() as connection:

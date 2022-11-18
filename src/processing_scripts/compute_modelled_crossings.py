@@ -39,11 +39,13 @@ dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 
     
 def createTable(connection):
-    #note: we will add to this table for
-    #each species as the values
-    #are computed for those species
     
     query = f"""
+        --create an archive table so we can keep modelled_id stable
+        DROP TABLE IF EXISTS {dbTargetSchema}.{dbModelledCrossingsTable}_archive;
+        CREATE TABLE {dbTargetSchema}.{dbModelledCrossingsTable}_archive 
+        AS SELECT * FROM {dbTargetSchema}.{dbModelledCrossingsTable};
+        
         DROP TABLE IF EXISTS {dbTargetSchema}.{dbModelledCrossingsTable};
         
         CREATE TABLE {dbTargetSchema}.{dbModelledCrossingsTable} (
@@ -69,8 +71,6 @@ def createTable(connection):
     
     with connection.cursor() as cursor:
         cursor.execute(query)
-        
-
 
 def computeCrossings(connection):
         
@@ -152,6 +152,36 @@ def computeCrossings(connection):
     with connection.cursor() as cursor:
         cursor.execute(query)
 
+def matchArchive(connection):
+
+    query = f"""
+        WITH matched AS (
+            SELECT
+            a.modelled_id,
+            nn.modelled_id as archive_id,
+            nn.dist
+            FROM {dbTargetSchema}.{dbModelledCrossingsTable} a
+            CROSS JOIN LATERAL
+            (SELECT
+            modelled_id,
+            ST_Distance(a.geometry, b.geometry) as dist
+            FROM {dbTargetSchema}.{dbModelledCrossingsTable}_archive b
+            ORDER BY a.geometry <-> b.geometry
+            LIMIT 1) as nn
+            WHERE nn.dist < 10
+        )
+
+        UPDATE {dbTargetSchema}.{dbModelledCrossingsTable} a
+            SET modelled_id = m.archive_id
+            FROM matched m
+            WHERE m.modelled_id = a.modelled_id;
+
+        --DROP TABLE {dbTargetSchema}.{dbModelledCrossingsTable}_archive;
+
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+
 def computeAttributes(connection):
     
     #assign all modelled crossings on 6th order streams and above a 
@@ -191,6 +221,9 @@ def main():
         
         print("  computing modelled crossings")
         computeCrossings(conn)
+
+        print("  matching to archived crossings")
+        matchArchive(conn)
 
         print("  calculating modelled crossing attributes")
         computeAttributes(conn)
