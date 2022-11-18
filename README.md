@@ -201,12 +201,14 @@ load_and_snap_fishobservations.py -c config.ini [watershedid] -user [username] -
 
 ---
 #### 4 - Compute Modelled Crossings
-This script computes modelled crossings defined as locations where rail, road, or trails cross stream networks (based on feature geometries). Due to mapping errors, these crossings may not actually exist on the ground.
+This script computes modelled crossings defined as locations where rail, road, or trails cross stream networks (based on feature geometries). Due to mapping errors, these crossings may not actually exist on the ground.   
+
+The modelled_id field for modelled crossings is a stable id. The second and all subsequent runs of compute_modelled_crossings.py will create an archive table of previous modelled crossings, and assign the modelled_id for newly generated crossings to their previous values, based on a distance threshold of 10 m.
 
 
 **Script**
 
-load_modelled_crossings.py -c config.ini [watershedid] -user [username] -password [password]
+compute_modelled_crossings.py -c config.ini [watershedid] -user [username] -password [password]
 
 **Input Requirements**
 
@@ -442,6 +444,8 @@ Habitat models are based on all of the following calculations for each species r
 * Gradient: stream_gradient ≥ gradient_min AND stream_gradient < gradient_max AND species_accessibility IN (ACCESSIBLE OR POTENTIALLY ACCESSIBLE)
 * Discharge (m3/s): stream_discharge ≥ discharge_min AND stream_discharge < discharge_max AND species_accessibility IN (ACCESSIBLE OR POTENTIALLY ACCESSIBLE)
 * Channel confinement (ratio of valley width / channel width): always true for now - model to be defined later
+
+Habitat models are also based on Strahler order - stream segments with a Strahler order of 1 are not considered suitable habitat for any species.
 
 gradient_min, gradient_max, discharge_min, and discharge_max are parameters defined for each fish species in the hydro.fish_species table. These parameters are separated in the fish_species table by spawning and rearing habitat.
 
