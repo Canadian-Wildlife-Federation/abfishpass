@@ -82,8 +82,6 @@ def loadAssessmentData(connection):
     # print(pycmd)
     subprocess.run(pycmd)
 
-    # TO DO: create new copy of predicted_points table where owner is 
-    # converted to ownership_type
     query = f"""
         INSERT INTO {dbTargetSchema}.{dbTargetTable} (
             disp_num,
@@ -234,7 +232,7 @@ def loadToBarriers(connection):
         DELETE FROM {dbTargetSchema}.{dbBarrierTable} WHERE type = 'stream_crossing';
         
         INSERT INTO {dbTargetSchema}.{dbBarrierTable}(
-            modelled_id, assessment_id, snapped_point,
+            id, modelled_id, assessment_id, snapped_point,
             type, owner, passability_status, disp_num,
             stream_name, strahler_order, stream_id, 
             transport_feature_name, critical_habitat,
@@ -244,7 +242,7 @@ def loadToBarriers(connection):
             year_planned, year_complete, comments
         )
         SELECT 
-            modelled_id, assessment_id, geometry,
+            modelled_id, modelled_id, assessment_id, geometry,
             'stream_crossing', ownership_type, passability_status, disp_num,
             stream_name, strahler_order, stream_id, 
             transport_feature_name, critical_habitat,
