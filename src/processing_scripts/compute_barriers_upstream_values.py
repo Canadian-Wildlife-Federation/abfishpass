@@ -558,7 +558,8 @@ def assignBarrierSpeciesCounts(connection):
         SET species_upstr = a.fish_survey_up,
             stock_upstr = a.fish_stock_up,
             barrier_cnt_upstr = a.barrier_up_cnt,
-            barriers_upstr = a.barriers_up
+            barriers_upstr = a.barriers_up,
+            gradient_barrier_cnt_upstr = a.gradient_barrier_up_cnt
         FROM {dbTargetSchema}.{dbTargetStreamTable} a
         WHERE a.id =  {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
         
@@ -566,7 +567,8 @@ def assignBarrierSpeciesCounts(connection):
         SET species_downstr = a.fish_survey_down,
             stock_downstr = a.fish_stock_down,
             barrier_cnt_downstr = a.barrier_down_cnt,
-            barriers_downstr = a.barriers_down
+            barriers_downstr = a.barriers_down,
+            gradient_barrier_cnt_downstr = a.gradient_barrier_down_cnt
         FROM {dbTargetSchema}.{dbTargetStreamTable} a
         WHERE a.id =  {dbTargetSchema}.{dbBarrierTable}.stream_id_down;
         
