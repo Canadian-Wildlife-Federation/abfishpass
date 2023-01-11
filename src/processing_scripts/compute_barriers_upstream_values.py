@@ -252,6 +252,10 @@ def processNodes():
                 spawn_habitat_all = spawn_habitat_all + inedge.spawn_habitatup_all
                 rear_habitat_all = rear_habitat_all + inedge.rear_habitatup_all
                 habitat_all = habitat_all + inedge.habitatup_all
+
+                spawn_funchabitat_all = spawn_funchabitat_all + inedge.spawn_funchabitatup_all
+                rear_funchabitat_all = rear_funchabitat_all + inedge.rear_funchabitatup_all
+                funchabitat_all = funchabitat_all + inedge.funchabitatup_all
                 
         if not allvisited:
             toprocess.append(node)
