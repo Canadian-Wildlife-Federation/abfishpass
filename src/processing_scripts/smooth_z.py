@@ -283,6 +283,16 @@ def main():
         
         print("  writing results")
         writeResults(conn)
+        # replace index on geometry field
+        query = f"""
+            DROP INDEX IF EXISTS {dbTargetSchema}.{dbTargetSchema}_{dbTargetTable}_geometry_idx;
+            CREATE INDEX IF NOT EXISTS {dbTargetSchema}_{dbTargetTable}_geometry_idx
+                ON {dbTargetSchema}.{dbTargetTable} USING gist
+                ({dbTargetGeom});
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+        conn.commit()
         
     print("done")
 

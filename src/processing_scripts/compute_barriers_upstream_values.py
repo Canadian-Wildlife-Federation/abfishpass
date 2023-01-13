@@ -252,13 +252,17 @@ def processNodes():
                 spawn_habitat_all = spawn_habitat_all + inedge.spawn_habitatup_all
                 rear_habitat_all = rear_habitat_all + inedge.rear_habitatup_all
                 habitat_all = habitat_all + inedge.habitatup_all
+
+                spawn_funchabitat_all = spawn_funchabitat_all + inedge.spawn_funchabitatup_all
+                rear_funchabitat_all = rear_funchabitat_all + inedge.rear_funchabitatup_all
+                funchabitat_all = funchabitat_all + inedge.funchabitatup_all
                 
         if not allvisited:
             toprocess.append(node)
         else:
         
             for outedge in node.outedges:
-                
+
                 for fish in species:
                     if (outedge.speca[fish] == appconfig.Accessibility.ACCESSIBLE.value or outedge.speca[fish] == appconfig.Accessibility.POTENTIAL.value):
                         outedge.specaup[fish] = uplength[fish] + outedge.length
@@ -280,26 +284,68 @@ def processNodes():
                     else:
                         outedge.habitatup[fish] = habitat[fish]
                         
+                    # if outedge.upbarriercnt != outbarriercnt:
+                    #     outedge.spawn_funchabitatup[fish] = outedge.length
+                    # elif outedge.spawn_habitat[fish]:
+                    #     outedge.spawn_funchabitatup[fish] = spawn_funchabitat[fish] + outedge.length
+                    # else: 
+                    #     outedge.spawn_funchabitatup[fish] = spawn_funchabitat[fish]
+                    
+                    ##################
+
                     if outedge.upbarriercnt != outbarriercnt:
-                        outedge.spawn_funchabitatup[fish] = outedge.length
+                        if outedge.spawn_habitat[fish]:
+                            outedge.spawn_funchabitatup[fish] = outedge.length
+                        else:
+                            outedge.spawn_funchabitatup[fish] = 0 
                     elif outedge.spawn_habitat[fish]:
                         outedge.spawn_funchabitatup[fish] = spawn_funchabitat[fish] + outedge.length
-                    else: 
+                    else:
                         outedge.spawn_funchabitatup[fish] = spawn_funchabitat[fish]
 
-                    if outedge.upbarriercnt != outbarriercnt:
-                        outedge.rear_funchabitatup[fish] = outedge.length
-                    elif outedge.rear_habitat[fish]:
-                        outedge.rear_funchabitatup[fish] = rear_funchabitat[fish] + outedge.length
-                    else: 
-                        outedge.rear_funchabitatup[fish] = rear_funchabitat[fish]
+                    ##################
+
+                    # if outedge.upbarriercnt != outbarriercnt:
+                    #     outedge.rear_funchabitatup[fish] = outedge.length
+                    # elif outedge.rear_habitat[fish]:
+                    #     outedge.rear_funchabitatup[fish] = rear_funchabitat[fish] + outedge.length
+                    # else: 
+                    #     outedge.rear_funchabitatup[fish] = rear_funchabitat[fish]
+
+                    ##################
 
                     if outedge.upbarriercnt != outbarriercnt:
-                        outedge.funchabitatup[fish] = outedge.length
+                        if outedge.rear_habitat[fish]:
+                            outedge.rear_funchabitatup[fish] = outedge.length
+                        else:
+                            outedge.rear_funchabitatup[fish] = 0 
+                    elif outedge.rear_habitat[fish]:
+                        outedge.rear_funchabitatup[fish] = rear_funchabitat[fish] + outedge.length
+                    else:
+                        outedge.rear_funchabitatup[fish] = rear_funchabitat[fish]
+
+                    ##################
+
+                    # if outedge.upbarriercnt != outbarriercnt:
+                    #     outedge.funchabitatup[fish] = outedge.length
+                    # elif outedge.habitat[fish]:
+                    #     outedge.funchabitatup[fish] = funchabitat[fish] + outedge.length
+                    # else: 
+                    #     outedge.funchabitatup[fish] = funchabitat[fish]
+
+                    ##################
+
+                    if outedge.upbarriercnt != outbarriercnt:
+                        if outedge.habitat[fish]:
+                            outedge.funchabitatup[fish] = outedge.length
+                        else:
+                            outedge.funchabitatup[fish] = 0
                     elif outedge.habitat[fish]:
                         outedge.funchabitatup[fish] = funchabitat[fish] + outedge.length
                     else: 
                         outedge.funchabitatup[fish] = funchabitat[fish]
+
+                    ##################
                 
                 if outedge.spawn_habitat_all:
                     outedge.spawn_habitatup_all = spawn_habitat_all + outedge.length
@@ -316,26 +362,68 @@ def processNodes():
                 else:
                     outedge.habitatup_all = habitat_all
                 
+                # if outedge.upbarriercnt != outbarriercnt:
+                #     outedge.spawn_funchabitatup_all = outedge.length
+                # elif outedge.spawn_habitat_all:
+                #     outedge.spawn_funchabitatup_all = spawn_funchabitat_all + outedge.length
+                # else: 
+                #     outedge.spawn_funchabitatup_all = spawn_funchabitat_all
+                
+                ##################
+
                 if outedge.upbarriercnt != outbarriercnt:
-                    outedge.spawn_funchabitatup_all = outedge.length
+                    if outedge.spawn_habitat_all:
+                        outedge.spawn_funchabitatup_all = outedge.length
+                    else:
+                        outedge.spawn_funchabitatup_all = 0
                 elif outedge.spawn_habitat_all:
                     outedge.spawn_funchabitatup_all = spawn_funchabitat_all + outedge.length
                 else: 
                     outedge.spawn_funchabitatup_all = spawn_funchabitat_all
 
+                ##################
+
+                # if outedge.upbarriercnt != outbarriercnt:
+                #     outedge.rear_funchabitatup_all = outedge.length
+                # elif outedge.rear_habitat_all:
+                #     outedge.rear_funchabitatup_all = rear_funchabitat_all + outedge.length
+                # else: 
+                #     outedge.rear_funchabitatup_all = rear_funchabitat_all
+
+                ##################
+
                 if outedge.upbarriercnt != outbarriercnt:
-                    outedge.rear_funchabitatup_all = outedge.length
+                    if outedge.rear_habitat_all:
+                        outedge.rear_funchabitatup_all = outedge.length
+                    else:
+                        outedge.rear_funchabitatup_all = 0
                 elif outedge.rear_habitat_all:
                     outedge.rear_funchabitatup_all = rear_funchabitat_all + outedge.length
                 else: 
                     outedge.rear_funchabitatup_all = rear_funchabitat_all
 
+                ##################
+
+                # if outedge.upbarriercnt != outbarriercnt:
+                #     outedge.funchabitatup_all = outedge.length
+                # elif outedge.habitat_all:
+                #     outedge.funchabitatup_all = funchabitat_all + outedge.length
+                # else: 
+                #     outedge.funchabitatup_all = funchabitat_all
+
+                ##################
+
                 if outedge.upbarriercnt != outbarriercnt:
-                    outedge.funchabitatup_all = outedge.length
+                    if outedge.habitat_all:
+                        outedge.funchabitatup_all = outedge.length
+                    else:
+                        outedge.funchabitatup_all = 0
                 elif outedge.habitat_all:
                     outedge.funchabitatup_all = funchabitat_all + outedge.length
                 else: 
                     outedge.funchabitatup_all = funchabitat_all
+
+                ##################
 
                 outedge.visited = True
                 if (not outedge.toNode in toprocess):
