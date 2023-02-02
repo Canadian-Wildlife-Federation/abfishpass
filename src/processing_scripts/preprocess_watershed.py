@@ -62,6 +62,12 @@ def main():
                  st_length2d(geometry) / 1000.0, geometry
             FROM {appconfig.dataSchema}.{appconfig.streamTable}
             WHERE {appconfig.dbWatershedIdField} = '{workingWatershedId}';
+
+            -------------------------
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} add column geometry_original geometry(LineString, {appconfig.dataSrid});
+            update {dbTargetSchema}.{dbTargetStreamTable} set geometry_original = geometry;
+            update {dbTargetSchema}.{dbTargetStreamTable} set geometry = st_snaptogrid(geometry, 0.01);
+            -------------------------
             
             
             --TODO: remove this when values are provided
