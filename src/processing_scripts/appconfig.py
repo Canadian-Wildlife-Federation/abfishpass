@@ -64,6 +64,7 @@ dataSrid = config['DATABASE']['working_srid']
 dbIdField = "id"
 dbGeomField = "geometry"
 dbWatershedIdField = "watershed_id"
+watershedTable = config['CREATE_LOAD_SCRIPT']['watershed_table']
 
 class Accessibility(enum.Enum):
     ACCESSIBLE = 'ACCESSIBLE'
