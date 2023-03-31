@@ -42,7 +42,7 @@ def main():
             DROP TABLE IF EXISTS {dbTargetSchema}.{dbBarrierTable};
 
             create table if not exists {dbTargetSchema}.{dbBarrierTable} (
-                id uuid not null default uuid_generate_v4(),
+                id serial not null,
                 cabd_id uuid,
                 modelled_id uuid,
                 assessment_id varchar,
@@ -126,8 +126,6 @@ def main():
                 passability_status,
                 type)
             VALUES (%s, ST_Transform(ST_GeomFromText('POINT(%s %s)',4617),{appconfig.dataSrid}), %s, %s, %s, UPPER(%s), 'dam');
-
-            UPDATE {dbTargetSchema}.{dbBarrierTable} SET id = cabd_id WHERE type = 'dam';
         """
         with conn.cursor() as cursor:
             for feature in output_data:
@@ -143,7 +141,7 @@ def main():
             BEGIN
                 FOR pnt_rec IN EXECUTE format('SELECT id, %I as rawg FROM %I.%I WHERE %I is not null', raw_geom, src_schema, src_table,raw_geom) 
                 LOOP 
-                    FOR fp_rec IN EXECUTE format ('SELECT fp.geometry  as geometry, st_distance(%L::geometry, fp.geometry) AS distance FROM {dbTargetSchema}.{dbTargetStreamTable} fp WHERE st_expand(%L::geometry, %L) && fp.geometry and st_distance(%L::geometry, fp.geometry) < %L ORDER BY distance ', pnt_rec.rawg, pnt_rec.rawg, max_distance_m, pnt_rec.rawg, max_distance_m)
+                    FOR fp_rec IN EXECUTE format ('SELECT fp.geometry as geometry, st_distance(%L::geometry, fp.geometry) AS distance FROM {dbTargetSchema}.{dbTargetStreamTable} fp WHERE st_expand(%L::geometry, %L) && fp.geometry and st_distance(%L::geometry, fp.geometry) < %L ORDER BY distance ', pnt_rec.rawg, pnt_rec.rawg, max_distance_m, pnt_rec.rawg, max_distance_m)
                     LOOP
                         EXECUTE format('UPDATE %I.%I SET %I = ST_LineInterpolatePoint(%L::geometry, ST_LineLocatePoint(%L::geometry, %L::geometry) ) WHERE id = %L', src_schema, src_table, snapped_geom,fp_rec.geometry, fp_rec.geometry, pnt_rec.rawg, pnt_rec.id);
                         EXIT;
@@ -158,7 +156,11 @@ def main():
             --because using nhn_watershed_id can cover multiple HUC8 watersheds
             DELETE FROM {dbTargetSchema}.{dbBarrierTable}
             WHERE snapped_point IS NULL
-            AND type = 'dam'; 
+            AND type = 'dam';
+            
+            --reset sequence so we have consistent values after removing features
+            ALTER SEQUENCE {dbTargetSchema}.barriers_id_seq RESTART WITH 1;
+            UPDATE {dbTargetSchema}.{dbBarrierTable} SET id = DEFAULT; 
         """
         with conn.cursor() as cursor:
             cursor.execute(query)
@@ -166,5 +168,7 @@ def main():
          
     print("Loading Barriers from CABD dataset complete")
 
+    # TO DO: add any other barrier types - e.g., beaver activity, barrier beaches, etc.
+
 if __name__ == "__main__":
-    main()     
+    main()
