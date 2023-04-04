@@ -52,14 +52,14 @@ def main():
             GRANT USAGE ON SCHEMA {dbTargetSchema} TO public;
             GRANT SELECT ON {dbTargetSchema}.{dbTargetStreamTable} to public;
             ALTER DEFAULT PRIVILEGES IN SCHEMA {dbTargetSchema} GRANT SELECT ON TABLES TO public;
-    
-            DELETE FROM {dbTargetSchema}.{dbTargetStreamTable} WHERE {appconfig.dbWatershedIdField} = '{workingWatershedId}';
 
             INSERT INTO {dbTargetSchema}.{dbTargetStreamTable} 
-                ({appconfig.dbIdField}, source_id, {appconfig.dbWatershedIdField}, 
+                ({appconfig.dbIdField}, source_id,
+                {appconfig.dbWatershedIdField}, 
                 stream_name, strahler_order, geometry)
-            SELECT gen_random_uuid(), {appconfig.dbIdField},
-                {appconfig.dbWatershedIdField}, stream_name, strahler_order,
+            SELECT gen_random_uuid(), id,
+                aoi_id,
+                stream_name, strahler_order,
                 CASE
                 WHEN ST_WITHIN(t1.geometry,t2.geometry)
                 THEN t1.geometry
@@ -67,7 +67,7 @@ def main():
                 END AS geometry
             FROM {appconfig.dataSchema}.{appconfig.streamTable} t1
             JOIN {appconfig.dataSchema}.{appconfig.watershedTable} t2 ON ST_Intersects(t1.geometry, t2.geometry)
-            WHERE {appconfig.dbWatershedIdField} = '{workingWatershedId}';
+            WHERE aoi_id = '{workingWatershedId}';
 
             -------------------------
             UPDATE {dbTargetSchema}.{dbTargetStreamTable} set segment_length = st_length2d(geometry) / 1000.0;
@@ -75,7 +75,6 @@ def main():
             update {dbTargetSchema}.{dbTargetStreamTable} set geometry_original = geometry;
             update {dbTargetSchema}.{dbTargetStreamTable} set geometry = st_snaptogrid(geometry, 0.01);
             -------------------------
-            
             
             --TODO: remove this when values are provided
             ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} add column {appconfig.streamTableChannelConfinementField} numeric;
@@ -86,6 +85,7 @@ def main():
             
        
         """
+        # print(query)
         with conn.cursor() as cursor:
             cursor.execute(query)
         conn.commit()
