@@ -33,6 +33,14 @@ watershedfile = appconfig.config['CREATE_LOAD_SCRIPT']['watershed_data']
 temptable = appconfig.dataSchema + ".temp"
 
 with appconfig.connectdb() as conn:
+
+    print("Loading Watershed Boundaries")
+    layer = "PEIWatersheds"
+    datatable = appconfig.dataSchema + "." + watershedTable
+    orgDb="dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost+"' port='"+appconfig.dbPort+"' user='"+appconfig.dbUser+"' password='"+ appconfig.dbPassword+"'"
+    pycmd = '"' + appconfig.ogr + '" -overwrite -f "PostgreSQL" PG:"' + orgDb + '" -t_srs EPSG:' + appconfig.dataSrid + ' -nlt geometry -nln "' + datatable + '" -nlt CONVERT_TO_LINEAR -lco GEOMETRY_NAME=geometry "' + watershedfile + '" ' + layer
+    #print(pycmd)
+    subprocess.run(pycmd)
     
     print("Loading Streams")
     layer = "stream"
@@ -100,7 +108,7 @@ with appconfig.connectdb() as conn:
         ef_subtype,
         rank,
         length,
-        aoi_id::uuid,
+        aoi_id,
         from_nexus_id::uuid,
         to_nexus_id::uuid,
         ecatchment_id::uuid,
@@ -151,6 +159,7 @@ with appconfig.connectdb() as conn:
     print("Loading Roads")
     layer = "road"
     datatable = appconfig.dataSchema + "." + roadTable
+    wshedtable = appconfig.dataSchema + "." + watershedTable
     orgDb="dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost+"' port='"+appconfig.dbPort+"' user='"+appconfig.dbUser+"' password='"+ appconfig.dbPassword+"'"
     pycmd = '"' + appconfig.ogr + '" -overwrite -f "PostgreSQL" PG:"' + orgDb + '" -t_srs EPSG:' + appconfig.dataSrid + ' -nlt CONVERT_TO_LINEAR  -nln "' + temptable + '" -lco GEOMETRY_NAME=geometry "' + file + '" ' + layer
     #print(pycmd)
@@ -159,19 +168,23 @@ with appconfig.connectdb() as conn:
     query = f"""
     TRUNCATE TABLE {datatable};
 
-    ALTER TABLE {temptable} ALTER COLUMN geometry TYPE geometry(MULTILINESTRING,{appconfig.dataSrid}) USING ST_Force2D(geometry);
-
-    INSERT INTO {datatable} (
+    INSERT INTO {datatable}(
         id,
         name,
         geometry)       
     SELECT
         gen_random_uuid(),
-        name,
-        st_geometryn(geometry, generate_series(1, st_numgeometries(geometry))) 
+        t1.name,
+        CASE
+            WHEN ST_WITHIN(t1.geometry,t2.geometry)
+            THEN t1.geometry
+            ELSE ST_Intersection(t1.geometry, t2.geometry)
+            END AS geometry 
     FROM
-    {temptable};
+    {temptable} t1
+    JOIN {wshedtable} t2 ON ST_Intersects(t1.geometry, t2.geometry);
 
+    UPDATE {datatable} SET name = NULL WHERE name = 'Placemark';
     UPDATE {datatable} SET name = NULL WHERE length(trim(name)) = 0;
     UPDATE {datatable} SET name = trim(name);
     
@@ -185,6 +198,7 @@ with appconfig.connectdb() as conn:
     print("Loading Trails")
     layer = "trail"
     datatable = appconfig.dataSchema + "." + trailTable
+    wshedtable = appconfig.dataSchema + "." + watershedTable
     orgDb="dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost+"' port='"+appconfig.dbPort+"' user='"+appconfig.dbUser+"' password='"+ appconfig.dbPassword+"'"
     pycmd = '"' + appconfig.ogr + '" -overwrite -f "PostgreSQL" PG:"' + orgDb + '" -t_srs EPSG:' + appconfig.dataSrid + ' -nlt geometry -nln "' + temptable + '" -nlt CONVERT_TO_LINEAR -nlt PROMOTE_TO_MULTI -lco GEOMETRY_NAME=geometry "' + file + '" ' + layer
     #print(pycmd)
@@ -194,17 +208,24 @@ with appconfig.connectdb() as conn:
 
     INSERT INTO {datatable} (
         id,
+        name,
         status,
         zone,
         geometry
     ) 
     SELECT
         gen_random_uuid(),
+        t1.name,
         status,
         zone,
-        st_geometryn(geometry, generate_series(1, st_numgeometries(geometry))) 
+        CASE
+            WHEN ST_WITHIN(t1.geometry,t2.geometry)
+            THEN t1.geometry
+            ELSE ST_Intersection(t1.geometry, t2.geometry)
+            END AS geometry
     FROM
-    {temptable};
+    {temptable} t1
+    JOIN {wshedtable} t2 ON ST_Intersects(t1.geometry, t2.geometry);
 
     DROP table {temptable};
 
@@ -213,13 +234,5 @@ with appconfig.connectdb() as conn:
     with conn.cursor() as cursor:
         cursor.execute(query)
     conn.commit()
-
-    print("Loading Watershed Boundaries")
-    layer = "PEIWatersheds"
-    datatable = appconfig.dataSchema + "." + watershedTable
-    orgDb="dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost+"' port='"+appconfig.dbPort+"' user='"+appconfig.dbUser+"' password='"+ appconfig.dbPassword+"'"
-    pycmd = '"' + appconfig.ogr + '" -overwrite -f "PostgreSQL" PG:"' + orgDb + '" -t_srs EPSG:' + appconfig.dataSrid + ' -nlt geometry -nln "' + datatable + '" -nlt CONVERT_TO_LINEAR -lco GEOMETRY_NAME=geometry "' + watershedfile + '" ' + layer
-    #print(pycmd)
-    subprocess.run(pycmd)
 
 print("Loading PEI dataset complete")

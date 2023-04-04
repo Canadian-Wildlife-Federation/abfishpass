@@ -43,7 +43,7 @@ query = f"""
         ef_subtype smallint,
         rank smallint,
         length double precision,
-        aoi_id uuid,
+        aoi_id varchar,
         from_nexus_id uuid,
         to_nexus_id uuid,
         ecatchment_id uuid,
