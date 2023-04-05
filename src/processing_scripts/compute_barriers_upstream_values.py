@@ -264,6 +264,7 @@ def processNodes():
             for outedge in node.outedges:
 
                 for fish in species:
+
                     if (outedge.speca[fish] == appconfig.Accessibility.ACCESSIBLE.value or outedge.speca[fish] == appconfig.Accessibility.POTENTIAL.value):
                         outedge.specaup[fish] = uplength[fish] + outedge.length
                     else:
@@ -274,24 +275,18 @@ def processNodes():
                     else:
                         outedge.spawn_habitatup[fish] = spawn_habitat[fish]
                     
+
                     if outedge.rear_habitat[fish]:
                         outedge.rear_habitatup[fish] = rear_habitat[fish] + outedge.length
                     else:
                         outedge.rear_habitatup[fish] = rear_habitat[fish]
                     
+
                     if outedge.habitat[fish]:
                         outedge.habitatup[fish] = habitat[fish] + outedge.length
                     else:
                         outedge.habitatup[fish] = habitat[fish]
-                        
-                    # if outedge.upbarriercnt != outbarriercnt:
-                    #     outedge.spawn_funchabitatup[fish] = outedge.length
-                    # elif outedge.spawn_habitat[fish]:
-                    #     outedge.spawn_funchabitatup[fish] = spawn_funchabitat[fish] + outedge.length
-                    # else: 
-                    #     outedge.spawn_funchabitatup[fish] = spawn_funchabitat[fish]
-                    
-                    ##################
+
 
                     if outedge.upbarriercnt != outbarriercnt:
                         if outedge.spawn_habitat[fish]:
@@ -303,16 +298,6 @@ def processNodes():
                     else:
                         outedge.spawn_funchabitatup[fish] = spawn_funchabitat[fish]
 
-                    ##################
-
-                    # if outedge.upbarriercnt != outbarriercnt:
-                    #     outedge.rear_funchabitatup[fish] = outedge.length
-                    # elif outedge.rear_habitat[fish]:
-                    #     outedge.rear_funchabitatup[fish] = rear_funchabitat[fish] + outedge.length
-                    # else: 
-                    #     outedge.rear_funchabitatup[fish] = rear_funchabitat[fish]
-
-                    ##################
 
                     if outedge.upbarriercnt != outbarriercnt:
                         if outedge.rear_habitat[fish]:
@@ -324,16 +309,6 @@ def processNodes():
                     else:
                         outedge.rear_funchabitatup[fish] = rear_funchabitat[fish]
 
-                    ##################
-
-                    # if outedge.upbarriercnt != outbarriercnt:
-                    #     outedge.funchabitatup[fish] = outedge.length
-                    # elif outedge.habitat[fish]:
-                    #     outedge.funchabitatup[fish] = funchabitat[fish] + outedge.length
-                    # else: 
-                    #     outedge.funchabitatup[fish] = funchabitat[fish]
-
-                    ##################
 
                     if outedge.upbarriercnt != outbarriercnt:
                         if outedge.habitat[fish]:
@@ -345,7 +320,6 @@ def processNodes():
                     else: 
                         outedge.funchabitatup[fish] = funchabitat[fish]
 
-                    ##################
                 
                 if outedge.spawn_habitat_all:
                     outedge.spawn_habitatup_all = spawn_habitat_all + outedge.length
@@ -362,14 +336,6 @@ def processNodes():
                 else:
                     outedge.habitatup_all = habitat_all
                 
-                # if outedge.upbarriercnt != outbarriercnt:
-                #     outedge.spawn_funchabitatup_all = outedge.length
-                # elif outedge.spawn_habitat_all:
-                #     outedge.spawn_funchabitatup_all = spawn_funchabitat_all + outedge.length
-                # else: 
-                #     outedge.spawn_funchabitatup_all = spawn_funchabitat_all
-                
-                ##################
 
                 if outedge.upbarriercnt != outbarriercnt:
                     if outedge.spawn_habitat_all:
@@ -381,16 +347,6 @@ def processNodes():
                 else: 
                     outedge.spawn_funchabitatup_all = spawn_funchabitat_all
 
-                ##################
-
-                # if outedge.upbarriercnt != outbarriercnt:
-                #     outedge.rear_funchabitatup_all = outedge.length
-                # elif outedge.rear_habitat_all:
-                #     outedge.rear_funchabitatup_all = rear_funchabitat_all + outedge.length
-                # else: 
-                #     outedge.rear_funchabitatup_all = rear_funchabitat_all
-
-                ##################
 
                 if outedge.upbarriercnt != outbarriercnt:
                     if outedge.rear_habitat_all:
@@ -402,16 +358,6 @@ def processNodes():
                 else: 
                     outedge.rear_funchabitatup_all = rear_funchabitat_all
 
-                ##################
-
-                # if outedge.upbarriercnt != outbarriercnt:
-                #     outedge.funchabitatup_all = outedge.length
-                # elif outedge.habitat_all:
-                #     outedge.funchabitatup_all = funchabitat_all + outedge.length
-                # else: 
-                #     outedge.funchabitatup_all = funchabitat_all
-
-                ##################
 
                 if outedge.upbarriercnt != outbarriercnt:
                     if outedge.habitat_all:
@@ -423,7 +369,6 @@ def processNodes():
                 else: 
                     outedge.funchabitatup_all = funchabitat_all
 
-                ##################
 
                 outedge.visited = True
                 if (not outedge.toNode in toprocess):
@@ -639,12 +584,11 @@ def writeResults(connection):
     connection.commit()
 
 
-def assignBarrierSpeciesCounts(connection):
+def assignBarrierCounts(connection):
     
     query = f"""
         UPDATE {dbTargetSchema}.{dbBarrierTable}
-        SET species_upstr = a.fish_survey_up,
-            stock_upstr = a.fish_stock_up,
+        SET 
             barrier_cnt_upstr = a.barrier_up_cnt,
             barriers_upstr = a.barriers_up,
             gradient_barrier_cnt_upstr = a.gradient_barrier_up_cnt
@@ -652,8 +596,7 @@ def assignBarrierSpeciesCounts(connection):
         WHERE a.id =  {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
         
         UPDATE {dbTargetSchema}.{dbBarrierTable}
-        SET species_downstr = a.fish_survey_down,
-            stock_downstr = a.fish_stock_down,
+        SET
             barrier_cnt_downstr = a.barrier_down_cnt,
             barriers_downstr = a.barriers_down,
             gradient_barrier_cnt_downstr = a.gradient_barrier_down_cnt
@@ -680,8 +623,8 @@ def main():
         
         print("Computing Habitat Models for Barriers")
         
-        print("  assigning barrier and species counts")
-        assignBarrierSpeciesCounts(conn)
+        print("  assigning barrier counts")
+        assignBarrierCounts(conn)
         
         print("  creating network")
         createNetwork(conn)
