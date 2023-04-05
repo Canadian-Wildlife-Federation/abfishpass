@@ -41,7 +41,7 @@ dbModelledCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_tab
 dbCrossingsTable = appconfig.config['CROSSINGS']['crossings_table']
 
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
-dbHuc8Table = appconfig.config['CREATE_LOAD_SCRIPT']['huc8_table']
+watershedTable = appconfig.config['CREATE_LOAD_SCRIPT']['watershed_table']
 joinDistance = appconfig.config['CROSSINGS']['join_distance']
 
 def loadAssessmentData(connection):
@@ -52,19 +52,23 @@ def loadAssessmentData(connection):
         DROP TABLE IF EXISTS {dbTargetSchema}.{dbTargetTable};
         
         CREATE TABLE {dbTargetSchema}.{dbTargetTable} (
-            unique_id uuid default uuid_generate_v4(),
-            disp_num varchar,
+            unique_id uuid default gen_random_uuid(),
+            culvert_number varchar,
+            structure_id varchar,
+            date_examined date,
+            examiners varchar,
+            latitude double precision,
+            longitude double precision,
+            road varchar,
+            structure_type varchar,
+            culvert_condition varchar,
+            comments varchar,
+            passability_status varchar,
             stream_name varchar,
-            ownership_type varchar,
+            "owner" varchar,
             crossing_type varchar,
             crossing_subtype varchar,
             crossing_status varchar,
-            last_inspection date,
-            passability_status varchar,
-            habitat_quality varchar,
-            year_planned numeric,
-            year_complete numeric,
-            comments varchar,
             geometry geometry(POINT, {appconfig.dataSrid}),
 
             primary key (unique_id)
@@ -84,44 +88,43 @@ def loadAssessmentData(connection):
 
     query = f"""
         INSERT INTO {dbTargetSchema}.{dbTargetTable} (
-            disp_num,
-            stream_name,
-            ownership_type,
-            crossing_type,
-            crossing_subtype,
-            crossing_status,
-            last_inspection,
-            passability_status,
-            habitat_quality,
-            year_planned,
-            year_complete,
+            culvert_number,
+            structure_id,
+            date_examined,
+            examiners,
+            latitude,
+            longitude,
+            road,
+            structure_type,
+            culvert_condition,
             comments,
+            passability_status,
             geometry
             )
         SELECT 
-            DISP_NUM,
-            StreamName,
-            OWNER,
-            CASE WHEN CrossingType ILIKE 'bridge%' THEN 'obs' ELSE NULL END,
-            CrossingType,
-            CASE WHEN inspected = 'YES' OR lastinspection IS NOT NULL THEN 'ASSESSED' ELSE NULL END,
-            lastinspection,
-            CASE WHEN fishpassage = 'No Concerns' THEN 'PASSABLE' WHEN fishpassage = 'Concerns' THEN 'BARRIER' ELSE 'POTENTIAL BARRIER' END,
-            habitatquality,
-            CASE WHEN year_planned IS NOT NULL AND year_planned != -1 THEN year_planned ELSE NULL END,
-            CASE WHEN year_complete IS NOT NULL AND year_complete != -1 THEN year_complete ELSE NULL END,
+            culvert_number,
+            structure_id,
+            date_examined::date,
+            examiners,
+            latitude,
+            longitude,
+            road,
+            structure_type,
+            culvert_condition,
             comments,
+            passability_status,
             geometry
         FROM {dataSchema}.{dbTempTable};
 
-        UPDATE {dbTargetSchema}.{dbTargetTable}
-        SET crossing_subtype = 
-            CASE
-            WHEN crossing_subtype ILIKE 'bridge%' THEN 'bridge'
-            WHEN crossing_subtype ILIKE 'culvert%' THEN 'culvert'
-            WHEN crossing_subtype ILIKE 'ford%' THEN 'ford'
-            WHEN crossing_subtype IS NULL OR crossing_subtype = 'No crossing present' THEN NULL
-            ELSE 'other' END;
+        -- TO DO: update this after we see what information we have in assessment data
+        -- UPDATE {dbTargetSchema}.{dbTargetTable}
+        -- SET crossing_subtype = 
+        --     CASE
+        --     WHEN crossing_subtype ILIKE 'bridge%' THEN 'bridge'
+        --     WHEN crossing_subtype ILIKE 'culvert%' THEN 'culvert'
+        --     WHEN crossing_subtype ILIKE 'ford%' THEN 'ford'
+        --     WHEN crossing_subtype IS NULL OR crossing_subtype = 'No crossing present' THEN NULL
+        --     ELSE 'other' END;
 
     """
     with connection.cursor() as cursor:
@@ -136,36 +139,33 @@ def joinAssessmentData(connection):
         CREATE TABLE {dbTargetSchema}.{dbCrossingsTable} (
         modelled_id uuid,
         assessment_id uuid,
-        disp_num varchar,
         stream_name varchar,
         strahler_order integer,
-        stream_id uuid, 
-        stream_measure numeric,
+        stream_id uuid,
         wshed_name varchar,
-        wshed_priority varchar,
         transport_feature_name varchar,
-        ownership_type varchar,
-        
-        critical_habitat varchar[],
-        
         passability_status varchar,
-        last_inspection date,
-        
+
         crossing_status varchar CHECK (crossing_status in ('MODELLED', 'ASSESSED', 'HABITAT_CONFIRMATION', 'DESIGN', 'REMEDIATED')),
         crossing_feature_type varchar CHECK (crossing_feature_type IN ('ROAD', 'RAIL', 'TRAIL')),
         crossing_type varchar,
         crossing_subtype varchar,
-        
-        habitat_quality varchar,
-        year_planned integer,
-        year_complete integer,
+
+        owner varchar,
+        culvert_number varchar,
+        structure_id varchar,
+        date_examined date,
+        examiners varchar,
+        structure_type varchar,
+        culvert_condition varchar,
         comments varchar,
-        
+
         geometry geometry(Point, {appconfig.dataSrid}),
         
         primary key (modelled_id)
         );
 
+        -- add modelled crossings
         INSERT INTO {dbTargetSchema}.{dbCrossingsTable} (
             modelled_id,
             stream_name,
@@ -173,6 +173,7 @@ def joinAssessmentData(connection):
             stream_id,
             transport_feature_name,
             passability_status,
+
             crossing_status,
             crossing_feature_type,
             crossing_type,
@@ -186,6 +187,7 @@ def joinAssessmentData(connection):
             stream_id,
             transport_feature_name,
             passability_status,
+
             crossing_status,
             crossing_feature_type,
             crossing_type,
@@ -193,6 +195,8 @@ def joinAssessmentData(connection):
             geometry
         FROM {dbTargetSchema}.{dbModelledCrossingsTable};
 
+        --match assessment data to modelled points
+        --TO DO: figure out if any assessment data does not / should not match a modelled point
         with match AS (
             SELECT
                 DISTINCT ON (assess.unique_id) assess.unique_id AS unique_id, model.modelled_id AS modelled_id, ST_Distance(model.geometry, assess.geometry) AS dist
@@ -205,18 +209,17 @@ def joinAssessmentData(connection):
         FROM match AS a WHERE a.modelled_id = {dbTargetSchema}.{dbCrossingsTable}.modelled_id;
 
         UPDATE {dbTargetSchema}.{dbCrossingsTable} AS b
-        SET 
-            disp_num = CASE WHEN a.disp_num IS NOT NULL THEN a.disp_num ELSE b.disp_num END,
-            ownership_type = CASE WHEN a.ownership_type IS NOT NULL THEN a.ownership_type ELSE b.ownership_type END,
-            crossing_type = CASE WHEN a.crossing_type IS NOT NULL THEN a.crossing_type ELSE b.crossing_type END,
-            crossing_subtype = CASE WHEN a.crossing_subtype IS NOT NULL THEN a.crossing_subtype ELSE b.crossing_subtype END,
-            crossing_status = CASE WHEN a.crossing_status IS NOT NULL THEN a.crossing_status ELSE b.crossing_status END,
-            last_inspection = CASE WHEN a.last_inspection IS NOT NULL THEN a.last_inspection ELSE b.last_inspection END,
+        SET
+            culvert_number = CASE WHEN a.culvert_number IS NOT NULL THEN a.culvert_number ELSE b.culvert_number END,
+            structure_id = CASE WHEN a.structure_id IS NOT NULL THEN a.structure_id ELSE b.structure_id END,
+            date_examined = CASE WHEN a.date_examined IS NOT NULL THEN a.date_examined ELSE b.date_examined END,
+            examiners = CASE WHEN a.examiners IS NOT NULL THEN a.examiners ELSE b.examiners END,
+            transport_feature_name = CASE WHEN (a.road IS NOT NULL AND a.road IS DISTINCT FROM b.transport_feature_name) THEN a.road ELSE b.transport_feature_name END,
+            structure_type = CASE WHEN a.structure_type IS NOT NULL THEN a.structure_type ELSE b.structure_type END,
+            culvert_condition = CASE WHEN a.culvert_condition IS NOT NULL THEN a.culvert_condition ELSE b.culvert_condition END,
+            "comments" = CASE WHEN a.comments IS NOT NULL THEN a.comments ELSE b.comments END,
             passability_status = CASE WHEN a.passability_status IS NOT NULL THEN a.passability_status ELSE b.passability_status END,
-            habitat_quality = CASE WHEN a.habitat_quality IS NOT NULL THEN a.habitat_quality ELSE b.habitat_quality END,
-            year_planned = CASE WHEN a.year_planned IS NOT NULL THEN a.year_planned ELSE b.year_planned END,
-            year_complete = CASE WHEN a.year_complete IS NOT NULL THEN a.year_complete ELSE b.year_complete END,
-            comments = CASE WHEN a.comments IS NOT NULL THEN a.comments ELSE b.comments END
+            crossing_status = 'ASSESSED'
         FROM {dbTargetSchema}.{dbTargetTable} AS a
         WHERE b.assessment_id = a.unique_id;
 
@@ -232,32 +235,30 @@ def loadToBarriers(connection):
         DELETE FROM {dbTargetSchema}.{dbBarrierTable} WHERE type = 'stream_crossing';
         
         INSERT INTO {dbTargetSchema}.{dbBarrierTable}(
-            id, modelled_id, assessment_id, snapped_point,
-            type, owner, passability_status, disp_num,
+            modelled_id, assessment_id, snapped_point,
+            type, owner, passability_status,
             stream_name, strahler_order, stream_id, 
-            transport_feature_name, critical_habitat,
-            last_inspection, crossing_status,
+            transport_feature_name, crossing_status,
             crossing_feature_type, crossing_type,
-            crossing_subtype, habitat_quality,
-            year_planned, year_complete, comments
+            crossing_subtype, culvert_number,
+            structure_id, date_examined, examiners,
+            structure_type, culvert_condition,
+            "comments"
         )
         SELECT 
-            modelled_id, modelled_id, assessment_id, geometry,
-            'stream_crossing', ownership_type, passability_status, disp_num,
+            modelled_id, assessment_id, geometry,
+            'stream_crossing', owner, passability_status,
             stream_name, strahler_order, stream_id, 
-            transport_feature_name, critical_habitat,
-            last_inspection, crossing_status,
+            transport_feature_name, crossing_status,
             crossing_feature_type, crossing_type,
-            crossing_subtype, habitat_quality,
-            year_planned, year_complete, comments
+            crossing_subtype, culvert_number,
+            structure_id, date_examined, examiners,
+            structure_type, culvert_condition,
+            "comments"
         FROM {dbTargetSchema}.{dbCrossingsTable};
 
-        UPDATE {dbTargetSchema}.{dbBarrierTable} SET wshed_name = (SELECT name FROM {dataSchema}.{dbHuc8Table} WHERE huc_8 = '{dbWatershedId}');
-        UPDATE {dbTargetSchema}.{dbBarrierTable} SET wshed_priority = 
-            CASE
-            WHEN wshed_name = 'WILDHAY RIVER' THEN 1
-            WHEN wshed_name = 'BERLAND RIVER' THEN 2
-            ELSE NULL END;
+        -- TO DO: change this from hardcoded value if we need to separate watersheds
+        UPDATE {dbTargetSchema}.{dbBarrierTable} SET wshed_name = '01cd000';
 
     """
 

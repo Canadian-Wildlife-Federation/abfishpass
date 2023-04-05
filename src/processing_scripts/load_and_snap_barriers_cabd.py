@@ -55,26 +55,26 @@ def main():
 
                 dam_use varchar,
 
-                disp_num varchar,
                 stream_name varchar,
                 strahler_order integer,
                 stream_id uuid,
-                stream_measure numeric,
                 wshed_name varchar,
-                wshed_priority varchar,
                 transport_feature_name varchar,
 
                 critical_habitat varchar[],
                 
-                last_inspection date,
                 crossing_status varchar CHECK (crossing_status in ('MODELLED', 'ASSESSED', 'HABITAT_CONFIRMATION', 'DESIGN', 'REMEDIATED')),
                 crossing_feature_type varchar CHECK (crossing_feature_type IN ('ROAD', 'RAIL', 'TRAIL')),
                 crossing_type varchar,
                 crossing_subtype varchar,
                 
-                habitat_quality varchar,
-                year_planned integer,
-                year_complete integer,
+                culvert_number varchar,
+                structure_id varchar,
+                date_examined date,
+                examiners varchar,
+                road varchar,
+                structure_type varchar,
+                culvert_condition varchar,
                 comments varchar,
 
                 species_upstr varchar[],

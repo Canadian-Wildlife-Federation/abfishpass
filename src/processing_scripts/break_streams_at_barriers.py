@@ -48,7 +48,7 @@ def breakstreams (conn):
             
         CREATE TABLE {dbTargetSchema}.break_points(
             point geometry(POINT, {appconfig.dataSrid}),
-            barrier_id uuid,
+            barrier_id integer,
             type varchar,
             passability_status varchar
             );
@@ -66,7 +66,7 @@ def breakstreams (conn):
         
     # break at gradient points
 
-    query = f"""    
+    query = f"""
         SELECT min(accessibility_gradient) as minvalue 
         FROM {appconfig.dataSchema}.{appconfig.fishSpeciesTable}
     """
@@ -102,7 +102,7 @@ def breakstreams (conn):
             if (lastmainstem != mainstem and gradient > mingradient):
                 #we need to find what the gradient is at the downstream point here
                 # and only add this as a break point
-                # if downstream vertex is < 0.35
+                # if downstream vertex is < 0.15
                 query = f"""
                 
                     with pnt as (
@@ -133,7 +133,7 @@ def breakstreams (conn):
                 # this is a point that is not the first point on a new mainstem 
                 # has a gradient larger than required values
                 # and has a downstream gradient that is less than required values  
-                query = f"""INSERT INTO {dbTargetSchema}.break_points(point, barrier_id, type, passability_status) values ('{point}', gen_random_uuid(), 'gradient_barrier', 'BARRIER');""" 
+                query = f"""INSERT INTO {dbTargetSchema}.break_points(point, barrier_id, type, passability_status) values ('{point}', nextval('{dbTargetSchema}.{dbBarrierTable}_id_seq'), 'gradient_barrier', 'BARRIER');""" 
                 with conn.cursor() as cursor2:
                     cursor2.execute(query)
             lastmainstem = mainstem
@@ -185,7 +185,7 @@ def breakstreams (conn):
             segment_length,
             {appconfig.streamTableChannelConfinementField},{appconfig.streamTableDischargeField},
             mainstem_id, geometry)
-        SELECT  uuid_generate_v4(), a.source_id, a.{appconfig.dbWatershedIdField}, 
+        SELECT gen_random_uuid(), a.source_id, a.{appconfig.dbWatershedIdField}, 
             a.stream_name, a.strahler_order,
             st_length2d(a.geometry) / 1000.0, 
             a.{appconfig.streamTableChannelConfinementField},
@@ -235,7 +235,6 @@ def recomputeMainstreamMeasure(connection):
 def updateBarrier(connection):
     
     query = f"""
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS stream_measure;
         ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS stream_id;
         ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN IF NOT EXISTS stream_id_up uuid;
         
@@ -273,7 +272,6 @@ def updateBarrier(connection):
         
         ALTER TABLE {dbTargetSchema}.{dbModelledCrossingsTable} DROP COLUMN IF EXISTS stream_id;
 
-        ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS stream_measure;
         ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS stream_id;
         ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN IF NOT EXISTS stream_id_up uuid;
         ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN IF NOT EXISTS stream_id_down uuid;

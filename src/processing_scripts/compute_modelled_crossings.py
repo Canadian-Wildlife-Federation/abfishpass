@@ -172,7 +172,7 @@ def computeCrossings(connection):
             AND ST_DWithin(p1.geometry,p2.geometry,0.01));
 
     """
-    #print(query)
+    # print(query)
     with connection.cursor() as cursor:
         cursor.execute(query)
 
