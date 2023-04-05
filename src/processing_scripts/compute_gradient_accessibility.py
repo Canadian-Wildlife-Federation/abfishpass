@@ -57,16 +57,16 @@ class Node:
     
     def getMinDownstreamGradient(self):
         if (len(self.outedges) == 0):
-            return 0;
+            return 0
         
-        minvalue = None;
+        minvalue = None
         for edge in self.outedges:
             if (edge.mindowngradient < 0 ): 
                 return -1
             elif (minvalue is None) or (edge.mindowngradient < minvalue):
                 minvalue = edge.mindowngradient
         
-        return minvalue;
+        return minvalue
     
 class Edge:
     def __init__(self, fromnode, tonode, fid, maxgradient, ls):
@@ -135,11 +135,11 @@ def processNodes():
     while (toprocess):
         node = toprocess.popleft()
         
-        downg = node.getMinDownstreamGradient();
+        downg = node.getMinDownstreamGradient()
         
         if (downg < 0):
             toprocess.append(node)
-            continue;
+            continue
         
         for edge in node.inedges:
             edge.mindowngradient = max (edge.maxgradient, downg)
@@ -160,7 +160,7 @@ def writeResults(connection):
         newdata.append( (edge.mindowngradient, edge.fid) )
     
     with connection.cursor() as cursor:    
-        psycopg2.extras.execute_batch(cursor, updatequery, newdata);
+        psycopg2.extras.execute_batch(cursor, updatequery, newdata)
             
     connection.commit()
     
@@ -179,20 +179,6 @@ def computeAccessibility(connection):
             code = feature[0]
             name = feature[1]
             maxvalue = feature[2]
-            
-            allcodes = feature[3]
-            
-            fishpt = []
-            nofishpt = []
-
-            for fcode in allcodes:
-                fish = "upper('" + fcode + "') LIKE ANY (fish_stock || fish_survey || fish_stock_up || fish_survey_up)"
-                nofish = "upper('" + fcode + "') NOT LIKE ANY (fish_stock || fish_survey || fish_stock_up || fish_survey_up)"
-                fishpt.append(fish)
-                nofishpt.append(nofish)
-            
-            fishpt = ' OR '.join(fishpt)
-            nofishpt = ' OR '.join(nofishpt)
 
             print("  processing " + name)
             
@@ -207,7 +193,6 @@ def computeAccessibility(connection):
                 CASE 
                   WHEN (gradient_barrier_down_cnt = 0 and barrier_down_cnt = 0) THEN '{appconfig.Accessibility.ACCESSIBLE.value}'
                   WHEN (gradient_barrier_down_cnt = 0 and barrier_down_cnt > 0) THEN '{appconfig.Accessibility.POTENTIAL.value}'
-                  WHEN (gradient_barrier_down_cnt > 0 AND {fishpt}) THEN '{appconfig.Accessibility.POTENTIAL.value}'
                   ELSE '{appconfig.Accessibility.NOT.value}' END;
                 
             """
