@@ -48,7 +48,7 @@ def breakstreams (conn):
             
         CREATE TABLE {dbTargetSchema}.break_points(
             point geometry(POINT, {appconfig.dataSrid}),
-            barrier_id integer,
+            barrier_id uuid not null primary key,
             type varchar,
             passability_status varchar
             );
@@ -133,7 +133,7 @@ def breakstreams (conn):
                 # this is a point that is not the first point on a new mainstem 
                 # has a gradient larger than required values
                 # and has a downstream gradient that is less than required values  
-                query = f"""INSERT INTO {dbTargetSchema}.break_points(point, barrier_id, type, passability_status) values ('{point}', nextval('{dbTargetSchema}.{dbBarrierTable}_id_seq'), 'gradient_barrier', 'BARRIER');""" 
+                query = f"""INSERT INTO {dbTargetSchema}.break_points(point, barrier_id, type, passability_status) values ('{point}', gen_random_uuid(), 'gradient_barrier', 'BARRIER');""" 
                 with conn.cursor() as cursor2:
                     cursor2.execute(query)
             lastmainstem = mainstem
@@ -155,7 +155,7 @@ def breakstreams (conn):
             FROM 
                 {dbTargetSchema}.{dbTargetStreamTable} a,  
                 {dbTargetSchema}.break_points b 
-            WHERE st_distance(st_force2d(a.geometry_smoothed3d), b.point) < 0.000000001 
+            WHERE st_distance(st_force2d(a.geometry_smoothed3d), b.point) < 0.000000001
             GROUP BY a.{appconfig.dbIdField}
         ),
         newlines as (
@@ -280,8 +280,8 @@ def updateBarrier(connection):
 
         UPDATE {dbTargetSchema}.{dbCrossingsTable} AS a
             SET 
-            stream_id_up = (SELECT stream_id_up FROM {dbTargetSchema}.{dbBarrierTable} AS b WHERE a.modelled_id = b.modelled_id),
-            stream_id_down = (SELECT stream_id_down FROM {dbTargetSchema}.{dbBarrierTable} AS b WHERE a.modelled_id = b.modelled_id);
+            stream_id_up = (SELECT stream_id_up FROM {dbTargetSchema}.{dbBarrierTable} AS b WHERE (a.modelled_id = b.modelled_id) OR (a.assessment_id = b.assessment_id)),
+            stream_id_down = (SELECT stream_id_down FROM {dbTargetSchema}.{dbBarrierTable} AS b WHERE (a.modelled_id = b.modelled_id) OR (a.assessment_id = b.assessment_id));
 
     """
     

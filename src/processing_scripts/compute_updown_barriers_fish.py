@@ -121,7 +121,7 @@ def createNetwork(connection):
         select 'down', a.id, b.id 
         from {dbTargetSchema}.{dbBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
         where b.geometry && st_buffer(a.snapped_point, 0.0000001)
-            and st_distance(st_endpoint(b.geometry), a.snapped_point) < 0.00000001 
+            and st_distance(st_endpoint(b.geometry), a.snapped_point) < 0.00000001
             and a.passability_status != 'PASSABLE'       
     """
    
@@ -154,7 +154,7 @@ def createNetwork(connection):
         select 'down', a.barrier_id, b.id 
         from {dbTargetSchema}.{dbGradientBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
         where b.geometry && st_buffer(a.point, 0.0000001)
-            and st_distance(st_endpoint(b.geometry), a.point) < 0.00000001 
+            and st_distance(st_endpoint(b.geometry), a.point) < 0.00000001
             and a.type = 'gradient_barrier'     
     """
    
