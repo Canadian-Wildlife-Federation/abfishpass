@@ -33,6 +33,7 @@ dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 dbGradientBarrierTable = appconfig.config['BARRIER_PROCESSING']['gradient_barrier_table']
+snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
 
 edges = []
 nodes = dict()
@@ -115,13 +116,13 @@ def createNetwork(connection):
         select 'up', a.id, b.id 
         from {dbTargetSchema}.{dbBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
         where b.geometry && st_buffer(a.snapped_point, 0.0000001)
-            and st_distance(st_startpoint(b.geometry), a.snapped_point) < 0.00000001
+            and st_distance(st_startpoint(b.geometry), a.snapped_point) < 0.01
             and a.passability_status != 'PASSABLE'
         union 
         select 'down', a.id, b.id 
         from {dbTargetSchema}.{dbBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
         where b.geometry && st_buffer(a.snapped_point, 0.0000001)
-            and st_distance(st_endpoint(b.geometry), a.snapped_point) < 0.00000001
+            and st_distance(st_endpoint(b.geometry), a.snapped_point) < 0.01
             and a.passability_status != 'PASSABLE'       
     """
    
@@ -145,16 +146,16 @@ def createNetwork(connection):
                         
     #add gradient barriers
     query = f"""
-        select 'up', a.barrier_id, b.id 
+        select 'up', a.id, b.id 
         from {dbTargetSchema}.{dbGradientBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
         where b.geometry && st_buffer(a.point, 0.0000001)
-            and st_distance(st_startpoint(b.geometry), a.point) < 0.00000001
+            and st_distance(st_startpoint(b.geometry), a.point) < 0.01
             and a.type = 'gradient_barrier'
         union 
-        select 'down', a.barrier_id, b.id 
+        select 'down', a.id, b.id 
         from {dbTargetSchema}.{dbGradientBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
         where b.geometry && st_buffer(a.point, 0.0000001)
-            and st_distance(st_endpoint(b.geometry), a.point) < 0.00000001
+            and st_distance(st_endpoint(b.geometry), a.point) < 0.01
             and a.type = 'gradient_barrier'     
     """
    

@@ -34,6 +34,7 @@ dbModelledCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_tab
 dbCrossingsTable = appconfig.config['CROSSINGS']['crossings_table']
 dbVertexTable = appconfig.config['GRADIENT_PROCESSING']['vertex_gradient_table']
 dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['smoothedgeometry_field']
+dbGradientBarrierTable = appconfig.config['BARRIER_PROCESSING']['gradient_barrier_table']
 
 def breakstreams (conn):
         
@@ -44,17 +45,17 @@ def breakstreams (conn):
     #     a segment if vertex gradient continuously large 
     
     query = f"""
-        DROP TABLE IF EXISTS {dbTargetSchema}.break_points;
+        DROP TABLE IF EXISTS {dbTargetSchema}.{dbGradientBarrierTable};
             
-        CREATE TABLE {dbTargetSchema}.break_points(
+        CREATE TABLE {dbTargetSchema}.{dbGradientBarrierTable}(
             point geometry(POINT, {appconfig.dataSrid}),
-            barrier_id uuid not null primary key,
+            id uuid,
             type varchar,
             passability_status varchar
             );
     
         -- barriers
-        INSERT INTO {dbTargetSchema}.break_points(point, barrier_id, type, passability_status) 
+        INSERT INTO {dbTargetSchema}.{dbGradientBarrierTable} (point, id, type, passability_status) 
             SELECT snapped_point, id, type, passability_status
             FROM {dbTargetSchema}.{dbBarrierTable};
     """
@@ -133,7 +134,7 @@ def breakstreams (conn):
                 # this is a point that is not the first point on a new mainstem 
                 # has a gradient larger than required values
                 # and has a downstream gradient that is less than required values  
-                query = f"""INSERT INTO {dbTargetSchema}.break_points(point, barrier_id, type, passability_status) values ('{point}', gen_random_uuid(), 'gradient_barrier', 'BARRIER');""" 
+                query = f"""INSERT INTO {dbTargetSchema}.{dbGradientBarrierTable} (point, id, type, passability_status) values ('{point}', gen_random_uuid(), 'gradient_barrier', 'BARRIER');""" 
                 with conn.cursor() as cursor2:
                     cursor2.execute(query)
             lastmainstem = mainstem
@@ -154,7 +155,7 @@ def breakstreams (conn):
                 st_collect(st_lineinterpolatepoint(a.geometry, st_linelocatepoint(a.geometry, b.point))) as rawpnt
             FROM 
                 {dbTargetSchema}.{dbTargetStreamTable} a,  
-                {dbTargetSchema}.break_points b 
+                {dbTargetSchema}.{dbGradientBarrierTable} b 
             WHERE st_distance(st_force2d(a.geometry_smoothed3d), b.point) < 0.000000001
             GROUP BY a.{appconfig.dbIdField}
         ),

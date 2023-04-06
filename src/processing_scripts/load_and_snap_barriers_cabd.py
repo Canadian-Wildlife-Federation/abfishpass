@@ -20,6 +20,7 @@
 # Loads dam barriers from the CABD API into local database
 #
 import appconfig
+import subprocess
 import psycopg2 as pg2
 import psycopg2.extras
 import json, urllib.request, requests
@@ -27,6 +28,9 @@ import json, urllib.request, requests
 iniSection = appconfig.args.args[0]
 
 dbTargetSchema = appconfig.config[iniSection]['output_schema']
+dbWatershedId = appconfig.config[iniSection]['watershed_id']
+beaverData = appconfig.config[iniSection]['beaver_data']
+dbTempTable = 'beaver_activity_' + dbWatershedId
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 workingWatershedId = appconfig.config[iniSection]['watershed_id']
 nhnWatershedId = appconfig.config[iniSection]['nhn_watershed_id']
@@ -39,19 +43,25 @@ def main():
     with appconfig.connectdb() as conn:
         # creates barriers table with attributes from CABD and crossings table
         query = f"""
+            --create an archive table so we can keep ids stable
+            --archive table will be used after loading assessment data
+            --DROP TABLE IF EXISTS {dbTargetSchema}.{dbBarrierTable}_archive;
+            --CREATE TABLE {dbTargetSchema}.{dbBarrierTable}_archive AS SELECT * FROM {dbTargetSchema}.{dbBarrierTable};
+            
             DROP TABLE IF EXISTS {dbTargetSchema}.{dbBarrierTable};
 
             create table if not exists {dbTargetSchema}.{dbBarrierTable} (
-                id serial not null,
+                id uuid not null default gen_random_uuid(),
                 cabd_id uuid,
                 modelled_id uuid,
-                assessment_id varchar,
+                assessment_id uuid,
                 original_point geometry(POINT, {appconfig.dataSrid}),
                 snapped_point geometry(POINT, {appconfig.dataSrid}),
                 name varchar(256),
                 type varchar(32),
                 owner varchar,
                 passability_status varchar,
+                passability_status_notes varchar,
 
                 dam_use varchar,
 
@@ -75,12 +85,7 @@ def main():
                 road varchar,
                 structure_type varchar,
                 culvert_condition varchar,
-                comments varchar,
-
-                species_upstr varchar[],
-                species_downstr varchar[],
-                stock_upstr varchar[],
-                stock_downstr varchar[],
+                action_items varchar,
 
                 barriers_upstr varchar[],
                 barriers_downstr varchar[],
@@ -157,18 +162,45 @@ def main():
             DELETE FROM {dbTargetSchema}.{dbBarrierTable}
             WHERE snapped_point IS NULL
             AND type = 'dam';
-            
-            --reset sequence so we have consistent values after removing features
-            ALTER SEQUENCE {dbTargetSchema}.barriers_id_seq RESTART WITH 1;
-            UPDATE {dbTargetSchema}.{dbBarrierTable} SET id = DEFAULT; 
         """
         with conn.cursor() as cursor:
             cursor.execute(query)
         conn.commit()
          
-    print("Loading Barriers from CABD dataset complete")
+        print("Loading barriers from CABD dataset complete")
 
-    # TO DO: add any other barrier types - e.g., beaver activity, barrier beaches, etc.
+        # add beaver activity data and snap to network
+        
+        orgDb="dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost+"' port='"+appconfig.dbPort+"' user='"+appconfig.dbUser+"' password='"+ appconfig.dbPassword+"'"
+
+        pycmd = '"' + appconfig.ogr + '" -overwrite -f "PostgreSQL" PG:"' + orgDb + '" -t_srs EPSG:' + appconfig.dataSrid + ' -nln "' + dbTargetSchema + '.' + dbTempTable + '" -lco GEOMETRY_NAME=geometry "' + beaverData + '" -oo EMPTY_STRING_AS_NULL=YES'
+        # print(pycmd)
+        subprocess.run(pycmd)
+
+        query = f"""
+            INSERT INTO {dbTargetSchema}.{dbBarrierTable} (
+                original_point,
+                passability_status,
+                type)
+            SELECT
+                ST_Force2D(geometry),
+                'UNKNOWN',
+                'beaver_activity'
+            FROM
+                {dbTargetSchema}.{dbTempTable};
+
+            SELECT public.snap_to_network('{dbTargetSchema}', '{dbBarrierTable}', 'original_point', 'snapped_point', '{snapDistance}');
+
+            DROP TABLE IF EXISTS {dbTargetSchema}.{dbTempTable};
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+        conn.commit()
+        
+        print("Loading beaver activity data complete")
+
+    print("Loading barrier data complete")
+
 
 if __name__ == "__main__":
     main()
