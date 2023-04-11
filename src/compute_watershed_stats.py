@@ -71,7 +71,7 @@ def main():
             
             query = f"""
                 INSERT INTO {appconfig.dataSchema}.{statTable} (watershed_id)
-                VALUES ({watershed_id});
+                VALUES ('{watershed_id}');
             """
             with connection.cursor() as cursor:
                 cursor.execute(query)

@@ -156,12 +156,12 @@ def breakstreams (conn):
             FROM 
                 {dbTargetSchema}.{dbTargetStreamTable} a,  
                 {dbTargetSchema}.{dbGradientBarrierTable} b 
-            WHERE st_distance(st_force2d(a.geometry_smoothed3d), b.point) < 0.000000001
+            WHERE st_distance(st_force2d(a.geometry_smoothed3d), b.point) < 0.01
             GROUP BY a.{appconfig.dbIdField}
         ),
         newlines as (
             SELECT {appconfig.dbIdField},
-                st_split(st_snap(geometry, rawpnt, 0.000000001), rawpnt) as geometry
+                st_split(st_snap(geometry, rawpnt, 0.01), rawpnt) as geometry
             FROM breakpoints 
         )
         
@@ -245,8 +245,8 @@ def updateBarrier(connection):
             SELECT a.id as stream_id, b.id as barrier_id
             FROM {dbTargetSchema}.{dbTargetStreamTable} a,
                 {dbTargetSchema}.{dbBarrierTable} b
-            WHERE a.geometry && st_buffer(b.snapped_point, 0.0000001) and
-                st_intersects(st_endpoint(a.geometry), st_buffer(b.snapped_point, 0.0000001))
+            WHERE a.geometry && st_buffer(b.snapped_point, 0.01) and
+                st_intersects(st_endpoint(a.geometry), st_buffer(b.snapped_point, 0.01))
         )
         UPDATE {dbTargetSchema}.{dbBarrierTable}
             SET stream_id_up = a.stream_id
@@ -261,8 +261,8 @@ def updateBarrier(connection):
             SELECT a.id as stream_id, b.id as barrier_id
             FROM {dbTargetSchema}.{dbTargetStreamTable} a,
                 {dbTargetSchema}.{dbBarrierTable} b
-            WHERE a.geometry && st_buffer(b.snapped_point, 0.0000001) and
-                st_intersects(st_startpoint(a.geometry), st_buffer(b.snapped_point, 0.0000001))
+            WHERE a.geometry && st_buffer(b.snapped_point, 0.01) and
+                st_intersects(st_startpoint(a.geometry), st_buffer(b.snapped_point, 0.01))
         )
         UPDATE {dbTargetSchema}.{dbBarrierTable}
             SET stream_id_down = a.stream_id

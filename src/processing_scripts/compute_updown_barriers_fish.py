@@ -115,13 +115,13 @@ def createNetwork(connection):
     query = f"""
         select 'up', a.id, b.id 
         from {dbTargetSchema}.{dbBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
-        where b.geometry && st_buffer(a.snapped_point, 0.0000001)
+        where b.geometry && st_buffer(a.snapped_point, 0.01)
             and st_distance(st_startpoint(b.geometry), a.snapped_point) < 0.01
             and a.passability_status != 'PASSABLE'
         union 
         select 'down', a.id, b.id 
         from {dbTargetSchema}.{dbBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
-        where b.geometry && st_buffer(a.snapped_point, 0.0000001)
+        where b.geometry && st_buffer(a.snapped_point, 0.01)
             and st_distance(st_endpoint(b.geometry), a.snapped_point) < 0.01
             and a.passability_status != 'PASSABLE'       
     """
@@ -148,13 +148,13 @@ def createNetwork(connection):
     query = f"""
         select 'up', a.id, b.id 
         from {dbTargetSchema}.{dbGradientBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
-        where b.geometry && st_buffer(a.point, 0.0000001)
+        where b.geometry && st_buffer(a.point, 0.01)
             and st_distance(st_startpoint(b.geometry), a.point) < 0.01
             and a.type = 'gradient_barrier'
         union 
         select 'down', a.id, b.id 
         from {dbTargetSchema}.{dbGradientBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
-        where b.geometry && st_buffer(a.point, 0.0000001)
+        where b.geometry && st_buffer(a.point, 0.01)
             and st_distance(st_endpoint(b.geometry), a.point) < 0.01
             and a.type = 'gradient_barrier'     
     """
