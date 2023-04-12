@@ -251,7 +251,7 @@ def joinAssessmentData(connection):
             passability_status = CASE WHEN a.passability_status IS NOT NULL THEN UPPER(a.passability_status) ELSE b.passability_status END,
             passability_status_notes = CASE WHEN a.passability_status_notes IS NOT NULL THEN a.passability_status_notes ELSE b.passability_status_notes END,
             action_items = CASE WHEN a.action_items IS NOT NULL THEN a.action_items ELSE b.action_items END,
-            crossing_status = 'ASSESSED'
+            crossing_status = CASE WHEN a.culvert_number IS NOT NULL THEN 'ASSESSED' ELSE b.crossing_status END
         FROM {dbTargetSchema}.{dbTargetTable} AS a
         WHERE b.assessment_id = a.assessment_id;
 

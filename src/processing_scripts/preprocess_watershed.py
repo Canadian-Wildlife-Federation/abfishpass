@@ -67,7 +67,8 @@ def main():
                 END AS geometry
             FROM {appconfig.dataSchema}.{appconfig.streamTable} t1
             JOIN {appconfig.dataSchema}.{appconfig.watershedTable} t2 ON ST_Intersects(t1.geometry, t2.geometry)
-            WHERE aoi_id = '{workingWatershedId}';
+            WHERE aoi_id = '{workingWatershedId}'
+            AND strahler_order IS NOT NULL;
 
             -------------------------
             UPDATE {dbTargetSchema}.{dbTargetStreamTable} set segment_length = st_length2d(geometry) / 1000.0;
