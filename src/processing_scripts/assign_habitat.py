@@ -31,7 +31,6 @@ dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 def computeHabitatModel(connection):
 
-    # spawning
     query = f"""
         SELECT code, name
         FROM {dataSchema}.{appconfig.fishSpeciesTable};
@@ -44,97 +43,73 @@ def computeHabitatModel(connection):
         for feature in features:
             code = feature[0]
             name = feature[1]
-
-            colname = "habitat_spawn_" + code
-
-            print("     processing " + name)
-
-            query = f"""
-                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS {colname};
-                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN IF NOT EXISTS {colname} boolean;
-                
-                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-                    SET {colname} = false;
-
-                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-                    SET {colname} = true
-                    FROM {habitatTable} f
-                    WHERE f.stream_id = source_id
-                    AND f.spawning ILIKE '%{code}%';
-                
-            """
-            # print(query)
-            with connection.cursor() as cursor2:
-                cursor2.execute(query)
-    
-    # rearing
-    query = f"""
-        SELECT code, name
-        FROM {dataSchema}.{appconfig.fishSpeciesTable};
-    """
-
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-        features = cursor.fetchall()
-    
-        for feature in features:
-            code = feature[0]
-            name = feature[1]
-
-            colname = "habitat_rear_" + code
-
-            print("     processing " + name)
-
-            query = f"""
-                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS {colname};
-                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN IF NOT EXISTS {colname} boolean;
-                
-                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-                    SET {colname} = false;
-
-                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-                    SET {colname} = true
-                    FROM {habitatTable} f
-                    WHERE f.stream_id = source_id
-                    AND f.rearing ILIKE '%{code}%';
-                
-            """
-            # print(query)
-            with connection.cursor() as cursor2:
-                cursor2.execute(query)
-
-    # general habitat
-    query = f"""
-        SELECT code, name
-        FROM {dataSchema}.{appconfig.fishSpeciesTable};
-    """
-
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-        features = cursor.fetchall()
-
-        for feature in features:
-            code = feature[0]
-            name = feature[1]
-            
-            spawning = "habitat_spawn_" + code
-            rearing = "habitat_rear_" + code
 
             colname = "habitat_" + code
 
-            query = f"""
-                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable}
-                    ADD COLUMN IF NOT EXISTS {colname} boolean;
-                
-                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-                    SET {colname} = false;
+            print("     processing " + name)
 
-                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-                    SET {colname} = CASE WHEN {spawning} = false AND {rearing} = false THEN false ELSE true END;
+            if code == 'as': # atlantic salmon
+
+                query = f"""
+                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS {colname};
+                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN IF NOT EXISTS {colname} boolean;
+                    
+                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                        SET {colname} = false;
+
+                    UPDATE {dbTargetSchema}.{dbTargetStreamTable}
+                        SET {colname} = true
+                        WHERE segment_gradient <= 0.03;
+
+                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                        SET {colname} = true
+                        FROM {habitatTable} f
+                        WHERE f.stream_id = source_id
+                        AND f.spawning ILIKE '%{code}%';
+                    
+                """
+                with connection.cursor() as cursor2:
+                    cursor2.execute(query)
+                connection.commit()
             
-            """
-            with connection.cursor() as cursor2:
-                cursor2.execute(query)
+            elif code == 'ae': # american eel
+
+                query = f"""
+                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS {colname};
+                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN IF NOT EXISTS {colname} boolean;
+                    
+                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                        SET {colname} = false;
+
+                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                        SET {colname} = true
+                        WHERE strahler_order >= 2;
+                    
+                """
+                with connection.cursor() as cursor2:
+                    cursor2.execute(query)
+                connection.commit()
+
+            elif code == 'sm': # smelt/gaspereau
+
+                query = f"""
+                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS {colname};
+                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN IF NOT EXISTS {colname} boolean;
+                    
+                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                        SET {colname} = false;
+
+                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                        SET {colname} = true
+                        WHERE {code}_accessibility IN ('{appconfig.Accessibility.ACCESSIBLE.value}', '{appconfig.Accessibility.POTENTIAL.value}');
+                    
+                """
+                with connection.cursor() as cursor2:
+                    cursor2.execute(query)
+                connection.commit()
+
+            else:
+                pass
 
 def main():                            
     #--- main program ---    
@@ -143,8 +118,6 @@ def main():
         conn.autocommit = False
         
         print("Computing Habitat Models Per Species")
-
-        print("  computing spawning and rearing habitat models per species")
         computeHabitatModel(conn)
         
     print("done")
