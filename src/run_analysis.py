@@ -34,7 +34,7 @@ from processing_scripts import compute_vertex_gradient
 from processing_scripts import compute_segment_gradient
 from processing_scripts import break_streams_at_barriers
 from processing_scripts import load_and_snap_fishobservation
-from processing_scripts import compute_gradient_accessibility
+from processing_scripts import compute_accessibility
 from processing_scripts import compute_updown_barriers_fish
 from processing_scripts import compute_habitat_models
 from processing_scripts import compute_barriers_upstream_values
@@ -61,7 +61,7 @@ assign_raw_z.main()
 smooth_z.main()
 compute_segment_gradient.main()
 compute_updown_barriers_fish.main()
-compute_gradient_accessibility.main()
+compute_accessibility.main()
 compute_habitat_models.main()
 compute_barriers_upstream_values.main()
 
