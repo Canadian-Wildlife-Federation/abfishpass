@@ -113,7 +113,7 @@ def createNetwork(connection):
             
     #add barriers
     query = f"""
-        select 'up', a.id, b.id 
+        select 'up', a.id, b.id
         from {dbTargetSchema}.{dbBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
         where b.geometry && st_buffer(a.snapped_point, 0.01)
             and st_distance(st_startpoint(b.geometry), a.snapped_point) < 0.01
@@ -245,7 +245,7 @@ def processNodes():
         allvisited = True
         
         for outedge in node.outedges:
-            if not inedge.visited:
+            if not outedge.visited:
                 allvisited = False
                 break
             else:
@@ -259,7 +259,7 @@ def processNodes():
                 inedge.downbarriers.update(downbarriers)
                 inedge.downgradient.update(downgradient)             
                 inedge.visited = True
-                if (not outedge.toNode in toprocess):
+                if (not inedge.toNode in toprocess):
                     toprocess.append(inedge.fromNode)
     
         
