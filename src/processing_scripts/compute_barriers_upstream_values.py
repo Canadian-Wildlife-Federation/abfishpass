@@ -62,53 +62,27 @@ class Edge:
         self.visited = False
         self.speca = {} # species accessibility
         self.specaup = {} # species accessibility upstream
-        self.spawn_habitat = {}
-        self.spawn_habitatup = {}
-        self.rear_habitat = {}
-        self.rear_habitatup = {}
         self.habitat = {}
         self.habitatup = {}
-        self.spawn_funchabitatup = {}
-        self.rear_funchabitatup = {}
         self.funchabitatup = {}
-        self.spawn_habitat_all = None
-        self.spawn_habitatup_all = {}
-        self.rear_habitat_all = None
-        self.rear_habitatup_all = {}
-        self.habitat_all = None
-        self.habitatup_all = {}
-        self.spawn_funchabitat_all = {}
-        self.rear_funchabitat_all = {}
-        self.funchabitat_all = {}
-        self.spawn_funchabitatup_all = {}
-        self.rear_funchabitatup_all = {}
-        self.funchabitatup_all = {}
-
         self.upbarriercnt = 0
     
     def print(self):
         print("fid:", self.fid)
-        print("spawn_habitat:", self.spawn_habitat)
-        print("rear_habitat:", self.rear_habitat)
         print("habitat:", self.habitat)
-        print("spawn_habitatup:", self.spawn_habitatup)
-        print("rear_habitatup:", self.rear_habitatup)
         print("habitatup:", self.habitatup)
-        print("spawn_habitat_all:", self.spawn_habitat_all)
-        print("rear_habitat_all:", self.rear_habitat_all)
-        print("habitat_all:", self.habitat_all)
 
-    def check_spawn_habitat_all(self):
-        result = any(val == True for val in self.spawn_habitat.values())
-        return result
+    # def check_spawn_habitat_all(self):
+    #     result = any(val == True for val in self.spawn_habitat.values())
+    #     return result
     
-    def check_rear_habitat_all(self):
-        result = any(val == True for val in self.rear_habitat.values())
-        return result
+    # def check_rear_habitat_all(self):
+    #     result = any(val == True for val in self.rear_habitat.values())
+    #     return result
 
-    def check_habitat_all(self):
-        result = any(val == True for val in self.habitat.values())
-        return result
+    # def check_habitat_all(self):
+    #     result = any(val == True for val in self.habitat.values())
+    #     return result
 
 def createNetwork(connection):
     
@@ -120,8 +94,6 @@ def createNetwork(connection):
     
 
     accessibilitymodel = ''
-    spawnhabitatmodel = ''
-    rearhabitatmodel = ''
     habitatmodel = ''
     with connection.cursor() as cursor:
         cursor.execute(query)
@@ -129,8 +101,6 @@ def createNetwork(connection):
         for feature in features:
             species.append(feature[0])
             accessibilitymodel = accessibilitymodel + ', ' + feature[0] + '_accessibility'
-            spawnhabitatmodel = spawnhabitatmodel + ', habitat_spawn_' + feature[0]
-            rearhabitatmodel = rearhabitatmodel + ', habitat_rear_' + feature[0]
             habitatmodel = habitatmodel + ', habitat_' + feature[0]
     
     
@@ -138,7 +108,7 @@ def createNetwork(connection):
         SELECT a.{appconfig.dbIdField} as id, 
             st_length(a.{appconfig.dbGeomField}), a.{appconfig.dbGeomField},
             barrier_up_cnt
-            {accessibilitymodel} {spawnhabitatmodel} {rearhabitatmodel} {habitatmodel}
+            {accessibilitymodel} {habitatmodel}
         FROM {dbTargetSchema}.{dbTargetStreamTable} a
     """
    
@@ -177,14 +147,8 @@ def createNetwork(connection):
             index = 4
             for fish in species:
                 edge.speca[fish] = feature[index]
-                edge.spawn_habitat[fish] = feature[index + len(species)]
-                edge.rear_habitat[fish] = feature[index + len(species)]
                 edge.habitat[fish] = feature[index + len(species)]
                 index = index + 1
-
-            edge.spawn_habitat_all = edge.check_spawn_habitat_all()
-            edge.rear_habitat_all = edge.check_rear_habitat_all()
-            edge.habitat_all = edge.check_habitat_all()
 
             edges.append(edge)
             
@@ -209,26 +173,12 @@ def processNodes():
         allvisited = True
         
         uplength = {}
-        spawn_habitat = {}
-        rear_habitat = {}
         habitat = {}
-        spawn_funchabitat = {}
-        rear_funchabitat = {}
         funchabitat = {}
-        spawn_habitat_all = 0
-        rear_habitat_all = 0
-        habitat_all = 0
-        spawn_funchabitat_all = 0
-        rear_funchabitat_all = 0
-        funchabitat_all = 0
         
         for fish in species:
             uplength[fish] = 0
-            spawn_habitat[fish] = 0
-            rear_habitat[fish] = 0
             habitat[fish] = 0
-            spawn_funchabitat[fish] = 0
-            rear_funchabitat[fish] = 0
             funchabitat[fish] = 0
         
         outbarriercnt = 0
@@ -242,20 +192,8 @@ def processNodes():
             else:
                 for fish in species:
                     uplength[fish] = uplength[fish] + inedge.specaup[fish]
-                    spawn_habitat[fish] = spawn_habitat[fish] + inedge.spawn_habitatup[fish]
-                    rear_habitat[fish] = rear_habitat[fish] + inedge.rear_habitatup[fish]
                     habitat[fish] = habitat[fish] + inedge.habitatup[fish]
-                    spawn_funchabitat[fish] = spawn_funchabitat[fish] + inedge.spawn_funchabitatup[fish]
-                    rear_funchabitat[fish] = rear_funchabitat[fish] + inedge.rear_funchabitatup[fish]
                     funchabitat[fish] = funchabitat[fish] + inedge.funchabitatup[fish]
-                
-                spawn_habitat_all = spawn_habitat_all + inedge.spawn_habitatup_all
-                rear_habitat_all = rear_habitat_all + inedge.rear_habitatup_all
-                habitat_all = habitat_all + inedge.habitatup_all
-
-                spawn_funchabitat_all = spawn_funchabitat_all + inedge.spawn_funchabitatup_all
-                rear_funchabitat_all = rear_funchabitat_all + inedge.rear_funchabitatup_all
-                funchabitat_all = funchabitat_all + inedge.funchabitatup_all
                 
         if not allvisited:
             toprocess.append(node)
@@ -269,46 +207,11 @@ def processNodes():
                         outedge.specaup[fish] = uplength[fish] + outedge.length
                     else:
                         outedge.specaup[fish] = uplength[fish]
-                        
-                    if outedge.spawn_habitat[fish]:
-                        outedge.spawn_habitatup[fish] = spawn_habitat[fish] + outedge.length
-                    else:
-                        outedge.spawn_habitatup[fish] = spawn_habitat[fish]
-                    
-
-                    if outedge.rear_habitat[fish]:
-                        outedge.rear_habitatup[fish] = rear_habitat[fish] + outedge.length
-                    else:
-                        outedge.rear_habitatup[fish] = rear_habitat[fish]
-                    
 
                     if outedge.habitat[fish]:
                         outedge.habitatup[fish] = habitat[fish] + outedge.length
                     else:
                         outedge.habitatup[fish] = habitat[fish]
-
-
-                    if outedge.upbarriercnt != outbarriercnt:
-                        if outedge.spawn_habitat[fish]:
-                            outedge.spawn_funchabitatup[fish] = outedge.length
-                        else:
-                            outedge.spawn_funchabitatup[fish] = 0 
-                    elif outedge.spawn_habitat[fish]:
-                        outedge.spawn_funchabitatup[fish] = spawn_funchabitat[fish] + outedge.length
-                    else:
-                        outedge.spawn_funchabitatup[fish] = spawn_funchabitat[fish]
-
-
-                    if outedge.upbarriercnt != outbarriercnt:
-                        if outedge.rear_habitat[fish]:
-                            outedge.rear_funchabitatup[fish] = outedge.length
-                        else:
-                            outedge.rear_funchabitatup[fish] = 0 
-                    elif outedge.rear_habitat[fish]:
-                        outedge.rear_funchabitatup[fish] = rear_funchabitat[fish] + outedge.length
-                    else:
-                        outedge.rear_funchabitatup[fish] = rear_funchabitat[fish]
-
 
                     if outedge.upbarriercnt != outbarriercnt:
                         if outedge.habitat[fish]:
@@ -320,56 +223,6 @@ def processNodes():
                     else: 
                         outedge.funchabitatup[fish] = funchabitat[fish]
 
-                
-                if outedge.spawn_habitat_all:
-                    outedge.spawn_habitatup_all = spawn_habitat_all + outedge.length
-                else:
-                    outedge.spawn_habitatup_all = spawn_habitat_all
-
-                if outedge.rear_habitat_all:
-                    outedge.rear_habitatup_all = rear_habitat_all + outedge.length
-                else:
-                    outedge.rear_habitatup_all = rear_habitat_all
-
-                if outedge.habitat_all:
-                    outedge.habitatup_all = habitat_all + outedge.length
-                else:
-                    outedge.habitatup_all = habitat_all
-                
-
-                if outedge.upbarriercnt != outbarriercnt:
-                    if outedge.spawn_habitat_all:
-                        outedge.spawn_funchabitatup_all = outedge.length
-                    else:
-                        outedge.spawn_funchabitatup_all = 0
-                elif outedge.spawn_habitat_all:
-                    outedge.spawn_funchabitatup_all = spawn_funchabitat_all + outedge.length
-                else: 
-                    outedge.spawn_funchabitatup_all = spawn_funchabitat_all
-
-
-                if outedge.upbarriercnt != outbarriercnt:
-                    if outedge.rear_habitat_all:
-                        outedge.rear_funchabitatup_all = outedge.length
-                    else:
-                        outedge.rear_funchabitatup_all = 0
-                elif outedge.rear_habitat_all:
-                    outedge.rear_funchabitatup_all = rear_funchabitat_all + outedge.length
-                else: 
-                    outedge.rear_funchabitatup_all = rear_funchabitat_all
-
-
-                if outedge.upbarriercnt != outbarriercnt:
-                    if outedge.habitat_all:
-                        outedge.funchabitatup_all = outedge.length
-                    else:
-                        outedge.funchabitatup_all = 0
-                elif outedge.habitat_all:
-                    outedge.funchabitatup_all = funchabitat_all + outedge.length
-                else: 
-                    outedge.funchabitatup_all = funchabitat_all
-
-
                 outedge.visited = True
                 if (not outedge.toNode in toprocess):
                     toprocess.append(outedge.toNode)
@@ -380,21 +233,9 @@ def writeResults(connection):
     inserttablestr = ''
     for fish in species:
         tablestr = tablestr + ', total_upstr_pot_access_' + fish + ' numeric'
-        tablestr = tablestr + ', total_upstr_hab_spawn_' + fish + ' numeric'
-        tablestr = tablestr + ', total_upstr_hab_rear_' + fish + ' numeric'
         tablestr = tablestr + ', total_upstr_hab_' + fish + ' numeric'
-        tablestr = tablestr + ', func_upstr_hab_spawn_' + fish + ' numeric'
-        tablestr = tablestr + ', func_upstr_hab_rear_' + fish + ' numeric'
         tablestr = tablestr + ', func_upstr_hab_' + fish + ' numeric'
-        inserttablestr = inserttablestr + ",%s,%s,%s,%s,%s,%s,%s"
-
-    tablestr = tablestr + ', total_upstr_hab_spawn_all' + ' numeric'
-    tablestr = tablestr + ', total_upstr_hab_rear_all' + ' numeric'
-    tablestr = tablestr + ', total_upstr_hab_all' + ' numeric'
-    tablestr = tablestr + ', func_upstr_hab_spawn_all' + ' numeric'
-    tablestr = tablestr + ', func_upstr_hab_rear_all' + ' numeric'
-    tablestr = tablestr + ', func_upstr_hab_all' + ' numeric'
-    inserttablestr = inserttablestr + ",%s,%s,%s,%s,%s,%s"
+        inserttablestr = inserttablestr + ",%s,%s,%s"
 
     query = f"""
         DROP TABLE IF EXISTS {dbTargetSchema}.temp;
@@ -420,19 +261,8 @@ def writeResults(connection):
         data.append(edge.fid)
         for fish in species:
             data.append (edge.specaup[fish])
-            data.append (edge.spawn_habitatup[fish])
-            data.append (edge.rear_habitatup[fish])
             data.append (edge.habitatup[fish])
-            data.append (edge.spawn_funchabitatup[fish])
-            data.append (edge.rear_funchabitatup[fish])
             data.append (edge.funchabitatup[fish])
-        
-        data.append(edge.spawn_habitatup_all)
-        data.append(edge.rear_habitatup_all)
-        data.append(edge.habitatup_all)
-        data.append(edge.spawn_funchabitatup_all)
-        data.append(edge.rear_funchabitatup_all)
-        data.append(edge.funchabitatup_all)
 
         newdata.append( data )
 
@@ -454,24 +284,6 @@ def writeResults(connection):
 
 
             --total upstream habitat
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS total_upstr_hab_spawn_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_hab_spawn_{fish} numeric;
-    
-            UPDATE {dbTargetSchema}.{dbBarrierTable} 
-            SET total_upstr_hab_spawn_{fish} = a.total_upstr_hab_spawn_{fish} / 1000.0 
-            FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
-            WHERE a.stream_id = b.id AND 
-                a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
-            
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS total_upstr_hab_rear_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_hab_rear_{fish} numeric;
-    
-            UPDATE {dbTargetSchema}.{dbBarrierTable} 
-            SET total_upstr_hab_rear_{fish} = a.total_upstr_hab_rear_{fish} / 1000.0 
-            FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
-            WHERE a.stream_id = b.id AND 
-                a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
-            
             ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS total_upstr_hab_{fish};
             ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_hab_{fish} numeric;
 
@@ -483,24 +295,6 @@ def writeResults(connection):
             
             
             --functional upstream habitat
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS func_upstr_hab_spawn_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN func_upstr_hab_spawn_{fish} numeric;
-    
-            UPDATE {dbTargetSchema}.{dbBarrierTable} 
-            SET func_upstr_hab_spawn_{fish} = a.func_upstr_hab_spawn_{fish} / 1000.0 
-            FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
-            WHERE a.stream_id = b.id AND 
-                a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
-            
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS func_upstr_hab_rear_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN func_upstr_hab_rear_{fish} numeric;
-    
-            UPDATE {dbTargetSchema}.{dbBarrierTable} 
-            SET func_upstr_hab_rear_{fish} = a.func_upstr_hab_rear_{fish} / 1000.0 
-            FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
-            WHERE a.stream_id = b.id AND 
-                a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
-
             ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS func_upstr_hab_{fish};
             ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN func_upstr_hab_{fish} numeric;
 
@@ -514,67 +308,6 @@ def writeResults(connection):
         with connection.cursor() as cursor:
             cursor.execute(query)
     
-    query = f"""
-        --total upstream habitat - all
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS total_upstr_hab_spawn_all;
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_hab_spawn_all numeric;
-
-        UPDATE {dbTargetSchema}.{dbBarrierTable} 
-        SET total_upstr_hab_spawn_all = a.total_upstr_hab_spawn_all / 1000.0 
-        FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
-        WHERE a.stream_id = b.id AND 
-            a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
-
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS total_upstr_hab_rear_all;
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_hab_rear_all numeric;
-
-        UPDATE {dbTargetSchema}.{dbBarrierTable} 
-        SET total_upstr_hab_rear_all = a.total_upstr_hab_rear_all / 1000.0 
-        FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
-        WHERE a.stream_id = b.id AND 
-            a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
-
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS total_upstr_hab_all;
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_hab_all numeric;
-
-        UPDATE {dbTargetSchema}.{dbBarrierTable} 
-        SET total_upstr_hab_all = a.total_upstr_hab_all / 1000.0 
-        FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
-        WHERE a.stream_id = b.id AND 
-            a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
-
-
-        --functional upstream habitat - all
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS func_upstr_hab_spawn_all;
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN func_upstr_hab_spawn_all numeric;
-
-        UPDATE {dbTargetSchema}.{dbBarrierTable} 
-        SET func_upstr_hab_spawn_all = a.func_upstr_hab_spawn_all / 1000.0 
-        FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
-        WHERE a.stream_id = b.id AND 
-            a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
-
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS func_upstr_hab_rear_all;
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN func_upstr_hab_rear_all numeric;
-
-        UPDATE {dbTargetSchema}.{dbBarrierTable} 
-        SET func_upstr_hab_rear_all = a.func_upstr_hab_rear_all / 1000.0 
-        FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
-        WHERE a.stream_id = b.id AND 
-            a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
-        
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS func_upstr_hab_all;
-        ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN func_upstr_hab_all numeric;
-
-        UPDATE {dbTargetSchema}.{dbBarrierTable} 
-        SET func_upstr_hab_all = a.func_upstr_hab_all / 1000.0 
-        FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
-        WHERE a.stream_id = b.id AND 
-            a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
-    """
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-
     query = f"""
         DROP TABLE {dbTargetSchema}.temp;
     """
