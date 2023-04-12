@@ -24,9 +24,6 @@
 
 
 import appconfig
-import shapely.wkb
-from collections import deque
-import psycopg2.extras
 from appconfig import dataSchema
 
 iniSection = appconfig.args.args[0]
