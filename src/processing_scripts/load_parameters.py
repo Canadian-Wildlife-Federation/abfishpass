@@ -51,7 +51,6 @@ def main():
             CREATE TABLE {appconfig.dataSchema}.{appconfig.fishSpeciesTable}(
                 code varchar(4) PRIMARY KEY,
                 name varchar,
-                allcodes varchar[],
                 
                 accessibility_gradient double precision not null,
                 
@@ -79,7 +78,6 @@ def main():
             INSERT INTO {appconfig.dataSchema}.{appconfig.fishSpeciesTable}(
                 code,
                 name,
-                allcodes,
 
                 accessibility_gradient,
 
@@ -101,7 +99,6 @@ def main():
             SELECT
                 code,
                 name,
-                string_to_array(trim(both '"' from allcodes), ','),
 
                 accessibility_gradient,
 

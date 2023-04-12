@@ -57,15 +57,24 @@ def computeHabitatModel(connection):
                     UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
                         SET {colname} = false;
 
+                    --main habitat calculation
                     UPDATE {dbTargetSchema}.{dbTargetStreamTable}
                         SET {colname} = true
                         WHERE segment_gradient <= 0.03;
 
+                    --override some segments as salmon habitat where redds have been observed
                     UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
                         SET {colname} = true
                         FROM {habitatTable} f
                         WHERE f.stream_id = source_id
                         AND f.spawning ILIKE '%{code}%';
+                    
+                    --override some segments that are not salmon habitat based on stream enhancement data
+                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                        SET {colname} = false
+                        FROM {habitatTable} f
+                        WHERE f.stream_id = source_id
+                        AND f.not_habitat_{code} IS TRUE;
                     
                 """
                 with connection.cursor() as cursor2:
