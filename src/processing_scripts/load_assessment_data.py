@@ -171,7 +171,6 @@ def joinAssessmentData(connection):
             stream_id,
             transport_feature_name,
             passability_status,
-
             crossing_status,
             crossing_feature_type,
             crossing_type,
@@ -185,7 +184,6 @@ def joinAssessmentData(connection):
             stream_id,
             transport_feature_name,
             passability_status,
-
             crossing_status,
             crossing_feature_type,
             crossing_type,
@@ -287,10 +285,56 @@ def loadToBarriers(connection):
             structure_type, culvert_condition, action_items
         FROM {dbTargetSchema}.{dbCrossingsTable};
 
-        -- TO DO: change this from hardcoded value if we need to separate watersheds
         UPDATE {dbTargetSchema}.{dbBarrierTable} SET wshed_name = '{dbWatershedId}';
         
         SELECT public.snap_to_network('{dbTargetSchema}', '{dbBarrierTable}', 'original_point', 'snapped_point', '{snapDistance}');
+
+        DELETE FROM {dbTargetSchema}.{dbBarrierTable}
+            WHERE modelled_id IN (
+            'd067a497-3ed4-40ae-8bf3-03b2a3701468',
+            '684384af-e469-44ed-afb5-209a41b8a38a'
+        );
+
+        UPDATE {dbTargetSchema}.{dbBarrierTable}
+            SET passability_status = 'PASSABLE',
+                passability_status_notes = 'Likely partial barrier due to fishway presence'
+            WHERE cabd_id = '04e4fc7c-e418-4fc3-b083-806f0b1f5c3c';
+
+        UPDATE {dbTargetSchema}.{dbBarrierTable}
+            SET passability_status = 'PASSABLE',
+                passability_status_notes = 'Marked as passable by CWF due to upstream spawning observations for Atlantic salmon'
+            WHERE cabd_id IN ('179709a4-6aa7-4545-9271-446adc3f6cd9', 'a3da4307-64dc-4fbf-9514-8298429a6bc8');
+
+        UPDATE {dbTargetSchema}.{dbBarrierTable}
+            SET passability_status = 'PASSABLE',
+                passability_status_notes = 'Marked as passable by CWF due to upstream spawning observations for Atlantic salmon'
+            WHERE modelled_id IN (
+            '9247ac5e-a030-4d35-9de6-cfb096e4ed3a',
+            'b1bb1547-a108-429d-b89a-13db3cacac0b',
+            'f4c67968-2839-4b05-aa89-2e30ca7506bb',
+            'd067a497-3ed4-40ae-8bf3-03b2a3701468',
+            '5be7c620-f059-4cde-8f9e-d467d51ad956',
+            '99c1df3d-1041-4e49-bbf0-1e26f735479e',
+            'aa505c04-e809-44c5-a3ee-fa97b0fe6ff9',
+            '684384af-e469-44ed-afb5-209a41b8a38a',
+            '5589d332-da33-4664-b78f-cdad70205359',
+            '1d3cb879-0764-47a5-b7be-a561f8db150f',
+            '5b4a85cf-afaf-4de1-8768-f1c50034210c',
+            '1d56009a-f5ec-458e-b512-3b395bb64516',
+            '6b85e3db-27bc-4e69-a2d0-6591283f8e6c',
+            '0ef6f6d3-6ac3-40ae-afa1-1eb3a5a0ae3d',
+            '1bed76ef-cdf1-42f8-bd3e-55d6679f3c92',
+            '93e1210e-75bf-4aa9-94db-9f64987bfc5a',
+            '4f700fa5-dea3-4a2b-960a-c4bbc2931ca4',
+            'c9ce0f64-4c76-40b3-b163-278570f12b8e',
+            'a0d38be9-0de6-4ad1-951a-189805bf2b16',
+            '0590089c-58ce-4bab-8ed4-169472f86c66'
+            );
+        
+        UPDATE {dbTargetSchema}.{dbBarrierTable}
+            SET passability_status = 'PASSABLE',
+                passability_status_notes = 'Marked as passable by CWF due to upstream spawning observations for Atlantic salmon. This may be at least a partial barrier, undersized and improperly installed (bent).'
+            WHERE modelled_id = 'fa057fdd-c88f-4541-ae16-ad49bfdfe706';
 
     """
 
