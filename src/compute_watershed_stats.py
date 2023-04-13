@@ -37,8 +37,8 @@ def main():
         
         CREATE TABLE IF NOT EXISTS {appconfig.dataSchema}.{statTable}(
             watershed_id varchar,
-            total_km numeric,
-            connectivity_status numeric,
+            total_km double precision,
+            connectivity_status double precision,
 
             primary key (watershed_id)
         );
@@ -87,9 +87,9 @@ def main():
                 col_query = f"""
                     {col_query}
                     ALTER TABLE {appconfig.dataSchema}.{statTable}
-                    ADD COLUMN IF NOT EXISTS {fish}_accessible_habitat_km numeric,
-                    ADD COLUMN IF NOT EXISTS {fish}_potentially_accessible_habitat_km numeric,
-                    ADD COLUMN IF NOT EXISTS {fish}_total_habitat_km numeric;
+                    ADD COLUMN IF NOT EXISTS {fish}_accessible_habitat_km double precision,
+                    ADD COLUMN IF NOT EXISTS {fish}_potentially_accessible_habitat_km double precision,
+                    ADD COLUMN IF NOT EXISTS {fish}_total_habitat_km double precision;
                 """
                 
                 fishaccess_query = f"""

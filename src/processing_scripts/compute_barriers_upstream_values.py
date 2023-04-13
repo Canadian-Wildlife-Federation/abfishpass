@@ -232,9 +232,9 @@ def writeResults(connection):
     tablestr = ''
     inserttablestr = ''
     for fish in species:
-        tablestr = tablestr + ', total_upstr_pot_access_' + fish + ' numeric'
-        tablestr = tablestr + ', total_upstr_hab_' + fish + ' numeric'
-        tablestr = tablestr + ', func_upstr_hab_' + fish + ' numeric'
+        tablestr = tablestr + ', total_upstr_pot_access_' + fish + ' double precision'
+        tablestr = tablestr + ', total_upstr_hab_' + fish + ' double precision'
+        tablestr = tablestr + ', func_upstr_hab_' + fish + ' double precision'
         inserttablestr = inserttablestr + ",%s,%s,%s"
 
     query = f"""
@@ -274,7 +274,7 @@ def writeResults(connection):
         query = f"""
             --upstream potentially accessible
             ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS total_upstr_pot_access_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_pot_access_{fish} numeric;
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_pot_access_{fish} double precision;
             
             UPDATE {dbTargetSchema}.{dbBarrierTable} 
             SET total_upstr_pot_access_{fish} = a.total_upstr_pot_access_{fish} / 1000.0 
@@ -285,7 +285,7 @@ def writeResults(connection):
 
             --total upstream habitat
             ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS total_upstr_hab_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_hab_{fish} numeric;
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN total_upstr_hab_{fish} double precision;
 
             UPDATE {dbTargetSchema}.{dbBarrierTable} 
             SET total_upstr_hab_{fish} = a.total_upstr_hab_{fish} / 1000.0 
@@ -296,7 +296,7 @@ def writeResults(connection):
             
             --functional upstream habitat
             ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS func_upstr_hab_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN func_upstr_hab_{fish} numeric;
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN func_upstr_hab_{fish} double precision;
 
             UPDATE {dbTargetSchema}.{dbBarrierTable} 
             SET func_upstr_hab_{fish} = a.func_upstr_hab_{fish} / 1000.0 
