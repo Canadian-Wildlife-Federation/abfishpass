@@ -303,7 +303,10 @@ def loadToBarriers(connection):
         UPDATE {dbTargetSchema}.{dbBarrierTable}
             SET passability_status = 'PASSABLE',
                 passability_status_notes = 'Marked as passable by CWF due to upstream spawning observations for Atlantic salmon'
-            WHERE cabd_id IN ('179709a4-6aa7-4545-9271-446adc3f6cd9', 'a3da4307-64dc-4fbf-9514-8298429a6bc8');
+            WHERE cabd_id IN (
+                '179709a4-6aa7-4545-9271-446adc3f6cd9',
+                'a3da4307-64dc-4fbf-9514-8298429a6bc8',
+                '87aefbb4-6d49-44d7-91ba-65f7447b13f5');
 
         UPDATE {dbTargetSchema}.{dbBarrierTable}
             SET passability_status = 'PASSABLE',
@@ -328,7 +331,10 @@ def loadToBarriers(connection):
             '4f700fa5-dea3-4a2b-960a-c4bbc2931ca4',
             'c9ce0f64-4c76-40b3-b163-278570f12b8e',
             'a0d38be9-0de6-4ad1-951a-189805bf2b16',
-            '0590089c-58ce-4bab-8ed4-169472f86c66'
+            '0590089c-58ce-4bab-8ed4-169472f86c66',
+            'c0f4e178-be9e-4f8a-86f2-07669bacedf8',
+            '8f23b98c-5a8e-4cd0-bb05-3c54b74884eb',
+            '3b6e0948-78ba-4a9a-9992-7b787699dded'
             );
         
         UPDATE {dbTargetSchema}.{dbBarrierTable}
