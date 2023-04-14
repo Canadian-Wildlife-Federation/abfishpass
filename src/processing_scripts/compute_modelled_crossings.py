@@ -18,7 +18,7 @@
 
 #
 # This script computes modelled crossings (stream intersections
-# with road/rail/trail network) and attributes that can be derived
+# with road/trail network) and attributes that can be derived
 # from the stream network
 #
 import appconfig
@@ -29,7 +29,6 @@ dbTargetSchema = appconfig.config[iniSection]['output_schema']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbModelledCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
-orderBarrierLimit = appconfig.config['CROSSINGS']['strahler_order_barrier_limit']
 
 roadTable = appconfig.config['CREATE_LOAD_SCRIPT']['road_table']
 railTable = appconfig.config['CREATE_LOAD_SCRIPT']['rail_table']
@@ -37,40 +36,87 @@ trailTable = appconfig.config['CREATE_LOAD_SCRIPT']['trail_table']
     
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 
-    
-def createTable(connection):
-    
+def tableExists(connection):
+
     query = f"""
-        --create an archive table so we can keep modelled_id stable
-        DROP TABLE IF EXISTS {dbTargetSchema}.{dbModelledCrossingsTable}_archive;
-        CREATE TABLE {dbTargetSchema}.{dbModelledCrossingsTable}_archive 
-        AS SELECT * FROM {dbTargetSchema}.{dbModelledCrossingsTable};
-        
-        DROP TABLE IF EXISTS {dbTargetSchema}.{dbModelledCrossingsTable};
-        
-        CREATE TABLE {dbTargetSchema}.{dbModelledCrossingsTable} (
-            modelled_id uuid default uuid_generate_v4(),
-            stream_name varchar,
-            strahler_order integer,
-            stream_id uuid, 
-            transport_feature_name varchar,
-            
-            passability_status varchar,
-            
-            crossing_status varchar,
-            crossing_feature_type varchar CHECK (crossing_feature_type IN ('ROAD', 'RAIL', 'TRAIL')),
-            crossing_type varchar,
-            crossing_subtype varchar,
-            
-            geometry geometry(Point, {appconfig.dataSrid}),
-            
-            primary key (modelled_id)
-        );
-        
+    SELECT EXISTS(SELECT 1 FROM information_schema.tables 
+    WHERE table_catalog='{appconfig.dbName}' AND 
+        table_schema='{dbTargetSchema}' AND 
+        table_name='{dbModelledCrossingsTable}');
     """
-    
+
     with connection.cursor() as cursor:
         cursor.execute(query)
+        result = cursor.fetchone()
+        result = result[0]
+
+    return result
+
+def createTable(connection):
+
+    result = tableExists(connection)
+
+    if result:
+
+        query = f"""
+            --create an archive table so we can keep modelled_id stable
+            DROP TABLE IF EXISTS {dbTargetSchema}.{dbModelledCrossingsTable}_archive;
+            CREATE TABLE {dbTargetSchema}.{dbModelledCrossingsTable}_archive 
+            AS SELECT * FROM {dbTargetSchema}.{dbModelledCrossingsTable};
+            
+            DROP TABLE IF EXISTS {dbTargetSchema}.{dbModelledCrossingsTable};
+            
+            CREATE TABLE {dbTargetSchema}.{dbModelledCrossingsTable} (
+                modelled_id uuid default gen_random_uuid(),
+                stream_name varchar,
+                strahler_order integer,
+                stream_id uuid, 
+                transport_feature_name varchar,
+                
+                passability_status varchar,
+                
+                crossing_status varchar,
+                crossing_feature_type varchar CHECK (crossing_feature_type IN ('ROAD', 'TRAIL')),
+                crossing_type varchar,
+                crossing_subtype varchar,
+                
+                geometry geometry(Point, {appconfig.dataSrid}),
+                
+                primary key (modelled_id)
+            );
+            
+        """
+    
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+    
+    else:
+        query = f"""
+            DROP TABLE IF EXISTS {dbTargetSchema}.{dbModelledCrossingsTable};
+            
+            CREATE TABLE {dbTargetSchema}.{dbModelledCrossingsTable} (
+                modelled_id uuid default gen_random_uuid(),
+                stream_name varchar,
+                strahler_order integer,
+                stream_id uuid, 
+                transport_feature_name varchar,
+                
+                passability_status varchar,
+                
+                crossing_status varchar,
+                crossing_feature_type varchar CHECK (crossing_feature_type IN ('ROAD', 'TRAIL')),
+                crossing_type varchar,
+                crossing_subtype varchar,
+                
+                geometry geometry(Point, {appconfig.dataSrid}),
+                
+                primary key (modelled_id)
+            );
+            
+        """
+    
+        with connection.cursor() as cursor:
+            cursor.execute(query)
 
 def computeCrossings(connection):
         
@@ -96,28 +142,6 @@ def computeCrossings(connection):
             from points
         );
         
-        
-        
-        --rail
-        INSERT INTO {dbTargetSchema}.{dbModelledCrossingsTable} 
-            (stream_name, strahler_order, stream_id, crossing_feature_type, geometry) 
-        
-        (       
-            with intersections as (       
-                select st_intersection(a.geometry, b.geometry) as geometry,
-                    a.id as stream_id, b.id as feature_id, 
-                    a.stream_name, a.strahler_order
-                from {dbTargetSchema}.{dbTargetStreamTable}  a,
-                     {appconfig.dataSchema}.{railTable} b
-                where st_intersects(a.geometry, b.geometry)
-            ),
-            points as(
-                select st_geometryn(geometry, generate_series(1, st_numgeometries(geometry))) as pnt, * 
-                from intersections
-            )
-            select stream_name, strahler_order, stream_id, 'RAIL', pnt 
-            from points
-        );
         
         --trail
         INSERT INTO {dbTargetSchema}.{dbModelledCrossingsTable} 
@@ -148,7 +172,7 @@ def computeCrossings(connection):
             AND ST_DWithin(p1.geometry,p2.geometry,0.01));
 
     """
-    #print(query)
+    # print(query)
     with connection.cursor() as cursor:
         cursor.execute(query)
 
@@ -176,7 +200,7 @@ def matchArchive(connection):
             FROM matched m
             WHERE m.modelled_id = a.modelled_id;
 
-        --DROP TABLE {dbTargetSchema}.{dbModelledCrossingsTable}_archive;
+        DROP TABLE {dbTargetSchema}.{dbModelledCrossingsTable}_archive;
 
     """
     with connection.cursor() as cursor:
@@ -184,25 +208,15 @@ def matchArchive(connection):
 
 def computeAttributes(connection):
     
-    #assign all modelled crossings on 6th order streams and above a 
-    #crossing_subtype of 'bridge' and a passability_status of 'passable'
+    #assign all modelled crossings a crossing_status and passability_status
     
     query = f"""
-        --set every crossing to crossing_status 'modelled'
         UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
         SET crossing_status = 'MODELLED';
-
-        UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
-        SET 
-            crossing_type = 'obs',
-            crossing_subtype = 'bridge',
-            passability_status = 'PASSABLE'
-        WHERE strahler_order >= {orderBarrierLimit};
         
-        --set everything else to potential for now
         UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
-        SET passability_status = 'POTENTIAL BARRIER'
-        WHERE passability_status is null;
+        SET passability_status = 'UNKNOWN'
+        WHERE passability_status IS NULL;
     """
     #print(query)
     with connection.cursor() as cursor:
@@ -215,20 +229,40 @@ def main():
         conn.autocommit = False
         
         print("Computing Modelled Crossings")
-        
-        print("  creating tables")
-        createTable(conn)
-        
-        print("  computing modelled crossings")
-        computeCrossings(conn)
 
-        print("  matching to archived crossings")
-        matchArchive(conn)
+        tableExists(conn)
 
-        print("  calculating modelled crossing attributes")
-        computeAttributes(conn)
+        result = tableExists(conn)
+
+        if result:
+
+            print("  creating tables")
+            createTable(conn)
+            
+            print("  computing modelled crossings")
+            computeCrossings(conn)
+
+            print("  matching to archived crossings")
+            matchArchive(conn)
+            
+            conn.commit()
+
+            print("  calculating modelled crossing attributes")
+            computeAttributes(conn)
+            
+            conn.commit()
         
-        conn.commit()
+        else:
+            print("  creating tables")
+            createTable(conn)
+            
+            print("  computing modelled crossings")
+            computeCrossings(conn)
+
+            print("  calculating modelled crossing attributes")
+            computeAttributes(conn)
+            
+            conn.commit()
                 
     print("done")
 

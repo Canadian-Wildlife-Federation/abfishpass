@@ -20,6 +20,7 @@
 # Loads dam barriers from the CABD API into local database
 #
 import appconfig
+import subprocess
 import psycopg2 as pg2
 import psycopg2.extras
 import json, urllib.request, requests
@@ -27,6 +28,9 @@ import json, urllib.request, requests
 iniSection = appconfig.args.args[0]
 
 dbTargetSchema = appconfig.config[iniSection]['output_schema']
+dbWatershedId = appconfig.config[iniSection]['watershed_id']
+beaverData = appconfig.config[iniSection]['beaver_data']
+dbTempTable = 'beaver_activity_' + dbWatershedId
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 workingWatershedId = appconfig.config[iniSection]['watershed_id']
 nhnWatershedId = appconfig.config[iniSection]['nhn_watershed_id']
@@ -39,48 +43,49 @@ def main():
     with appconfig.connectdb() as conn:
         # creates barriers table with attributes from CABD and crossings table
         query = f"""
+            --create an archive table so we can keep ids stable
+            --archive table will be used after loading assessment data
+            --DROP TABLE IF EXISTS {dbTargetSchema}.{dbBarrierTable}_archive;
+            --CREATE TABLE {dbTargetSchema}.{dbBarrierTable}_archive AS SELECT * FROM {dbTargetSchema}.{dbBarrierTable};
+            
             DROP TABLE IF EXISTS {dbTargetSchema}.{dbBarrierTable};
 
             create table if not exists {dbTargetSchema}.{dbBarrierTable} (
-                id uuid not null default uuid_generate_v4(),
+                id uuid not null default gen_random_uuid(),
                 cabd_id uuid,
                 modelled_id uuid,
-                assessment_id varchar,
+                assessment_id uuid,
                 original_point geometry(POINT, {appconfig.dataSrid}),
                 snapped_point geometry(POINT, {appconfig.dataSrid}),
                 name varchar(256),
                 type varchar(32),
                 owner varchar,
                 passability_status varchar,
+                passability_status_notes varchar,
 
                 dam_use varchar,
 
-                disp_num varchar,
                 stream_name varchar,
                 strahler_order integer,
                 stream_id uuid,
-                stream_measure numeric,
                 wshed_name varchar,
-                wshed_priority varchar,
                 transport_feature_name varchar,
 
                 critical_habitat varchar[],
                 
-                last_inspection date,
                 crossing_status varchar CHECK (crossing_status in ('MODELLED', 'ASSESSED', 'HABITAT_CONFIRMATION', 'DESIGN', 'REMEDIATED')),
                 crossing_feature_type varchar CHECK (crossing_feature_type IN ('ROAD', 'RAIL', 'TRAIL')),
                 crossing_type varchar,
                 crossing_subtype varchar,
                 
-                habitat_quality varchar,
-                year_planned integer,
-                year_complete integer,
-                comments varchar,
-
-                species_upstr varchar[],
-                species_downstr varchar[],
-                stock_upstr varchar[],
-                stock_downstr varchar[],
+                culvert_number varchar,
+                structure_id varchar,
+                date_examined date,
+                examiners varchar,
+                road varchar,
+                structure_type varchar,
+                culvert_condition varchar,
+                action_items varchar,
 
                 barriers_upstr varchar[],
                 barriers_downstr varchar[],
@@ -126,8 +131,6 @@ def main():
                 passability_status,
                 type)
             VALUES (%s, ST_Transform(ST_GeomFromText('POINT(%s %s)',4617),{appconfig.dataSrid}), %s, %s, %s, UPPER(%s), 'dam');
-
-            UPDATE {dbTargetSchema}.{dbBarrierTable} SET id = cabd_id WHERE type = 'dam';
         """
         with conn.cursor() as cursor:
             for feature in output_data:
@@ -143,7 +146,7 @@ def main():
             BEGIN
                 FOR pnt_rec IN EXECUTE format('SELECT id, %I as rawg FROM %I.%I WHERE %I is not null', raw_geom, src_schema, src_table,raw_geom) 
                 LOOP 
-                    FOR fp_rec IN EXECUTE format ('SELECT fp.geometry  as geometry, st_distance(%L::geometry, fp.geometry) AS distance FROM {dbTargetSchema}.{dbTargetStreamTable} fp WHERE st_expand(%L::geometry, %L) && fp.geometry and st_distance(%L::geometry, fp.geometry) < %L ORDER BY distance ', pnt_rec.rawg, pnt_rec.rawg, max_distance_m, pnt_rec.rawg, max_distance_m)
+                    FOR fp_rec IN EXECUTE format ('SELECT fp.geometry as geometry, st_distance(%L::geometry, fp.geometry) AS distance FROM {dbTargetSchema}.{dbTargetStreamTable} fp WHERE st_expand(%L::geometry, %L) && fp.geometry and st_distance(%L::geometry, fp.geometry) < %L ORDER BY distance ', pnt_rec.rawg, pnt_rec.rawg, max_distance_m, pnt_rec.rawg, max_distance_m)
                     LOOP
                         EXECUTE format('UPDATE %I.%I SET %I = ST_LineInterpolatePoint(%L::geometry, ST_LineLocatePoint(%L::geometry, %L::geometry) ) WHERE id = %L', src_schema, src_table, snapped_geom,fp_rec.geometry, fp_rec.geometry, pnt_rec.rawg, pnt_rec.id);
                         EXIT;
@@ -158,13 +161,46 @@ def main():
             --because using nhn_watershed_id can cover multiple HUC8 watersheds
             DELETE FROM {dbTargetSchema}.{dbBarrierTable}
             WHERE snapped_point IS NULL
-            AND type = 'dam'; 
+            AND type = 'dam';
         """
         with conn.cursor() as cursor:
             cursor.execute(query)
         conn.commit()
          
-    print("Loading Barriers from CABD dataset complete")
+        print("Loading barriers from CABD dataset complete")
+
+        # add beaver activity data and snap to network
+        
+        orgDb="dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost+"' port='"+appconfig.dbPort+"' user='"+appconfig.dbUser+"' password='"+ appconfig.dbPassword+"'"
+
+        pycmd = '"' + appconfig.ogr + '" -overwrite -f "PostgreSQL" PG:"' + orgDb + '" -t_srs EPSG:' + appconfig.dataSrid + ' -nln "' + dbTargetSchema + '.' + dbTempTable + '" -lco GEOMETRY_NAME=geometry "' + beaverData + '" -oo EMPTY_STRING_AS_NULL=YES'
+        # print(pycmd)
+        subprocess.run(pycmd)
+
+        query = f"""
+            INSERT INTO {dbTargetSchema}.{dbBarrierTable} (
+                original_point,
+                passability_status,
+                type)
+            SELECT
+                ST_Force2D(geometry),
+                'UNKNOWN',
+                'beaver_activity'
+            FROM
+                {dbTargetSchema}.{dbTempTable};
+
+            SELECT public.snap_to_network('{dbTargetSchema}', '{dbBarrierTable}', 'original_point', 'snapped_point', '{snapDistance}');
+
+            DROP TABLE IF EXISTS {dbTargetSchema}.{dbTempTable};
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+        conn.commit()
+        
+        print("Loading beaver activity data complete")
+
+    print("Loading barrier data complete")
+
 
 if __name__ == "__main__":
-    main()     
+    main()

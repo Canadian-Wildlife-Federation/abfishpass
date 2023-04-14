@@ -41,8 +41,9 @@ dbModelledCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_tab
 dbCrossingsTable = appconfig.config['CROSSINGS']['crossings_table']
 
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
-dbHuc8Table = appconfig.config['CREATE_LOAD_SCRIPT']['huc8_table']
+watershedTable = appconfig.config['CREATE_LOAD_SCRIPT']['watershed_table']
 joinDistance = appconfig.config['CROSSINGS']['join_distance']
+snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
 
 def loadAssessmentData(connection):
         
@@ -52,22 +53,27 @@ def loadAssessmentData(connection):
         DROP TABLE IF EXISTS {dbTargetSchema}.{dbTargetTable};
         
         CREATE TABLE {dbTargetSchema}.{dbTargetTable} (
-            unique_id uuid default uuid_generate_v4(),
-            disp_num varchar,
+            assessment_id uuid default gen_random_uuid(),
+            culvert_number varchar,
+            structure_id varchar,
+            date_examined date,
+            examiners varchar,
+            latitude double precision,
+            longitude double precision,
+            road varchar,
+            structure_type varchar,
+            culvert_condition varchar,
+            passability_status varchar,
+            passability_status_notes varchar,
+            action_items varchar,
             stream_name varchar,
-            ownership_type varchar,
+            "owner" varchar,
             crossing_type varchar,
             crossing_subtype varchar,
             crossing_status varchar,
-            last_inspection date,
-            passability_status varchar,
-            habitat_quality varchar,
-            year_planned numeric,
-            year_complete numeric,
-            comments varchar,
             geometry geometry(POINT, {appconfig.dataSrid}),
 
-            primary key (unique_id)
+            primary key (assessment_id)
         )
         
     """
@@ -84,44 +90,37 @@ def loadAssessmentData(connection):
 
     query = f"""
         INSERT INTO {dbTargetSchema}.{dbTargetTable} (
-            disp_num,
-            stream_name,
-            ownership_type,
-            crossing_type,
-            crossing_subtype,
-            crossing_status,
-            last_inspection,
+            culvert_number,
+            structure_id,
+            date_examined,
+            examiners,
+            latitude,
+            longitude,
+            road,
+            structure_type,
+            culvert_condition,
             passability_status,
-            habitat_quality,
-            year_planned,
-            year_complete,
-            comments,
+            passability_status_notes,
+            action_items,
             geometry
             )
         SELECT 
-            DISP_NUM,
-            StreamName,
-            OWNER,
-            CASE WHEN CrossingType ILIKE 'bridge%' THEN 'obs' ELSE NULL END,
-            CrossingType,
-            CASE WHEN inspected = 'YES' OR lastinspection IS NOT NULL THEN 'ASSESSED' ELSE NULL END,
-            lastinspection,
-            CASE WHEN fishpassage = 'No Concerns' THEN 'PASSABLE' WHEN fishpassage = 'Concerns' THEN 'BARRIER' ELSE 'POTENTIAL BARRIER' END,
-            habitatquality,
-            CASE WHEN year_planned IS NOT NULL AND year_planned != -1 THEN year_planned ELSE NULL END,
-            CASE WHEN year_complete IS NOT NULL AND year_complete != -1 THEN year_complete ELSE NULL END,
-            comments,
+            culvert_number,
+            structure_id,
+            date_examined::date,
+            examiners,
+            latitude,
+            longitude,
+            road,
+            structure_type,
+            culvert_condition,
+            passability_status,
+            passability_status_notes,
+            action_items,
             geometry
         FROM {dataSchema}.{dbTempTable};
 
-        UPDATE {dbTargetSchema}.{dbTargetTable}
-        SET crossing_subtype = 
-            CASE
-            WHEN crossing_subtype ILIKE 'bridge%' THEN 'bridge'
-            WHEN crossing_subtype ILIKE 'culvert%' THEN 'culvert'
-            WHEN crossing_subtype ILIKE 'ford%' THEN 'ford'
-            WHEN crossing_subtype IS NULL OR crossing_subtype = 'No crossing present' THEN NULL
-            ELSE 'other' END;
+        UPDATE {dbTargetSchema}.{dbTargetTable} SET crossing_subtype = 'culvert' where culvert_number ILIKE '%culvert%';
 
     """
     with connection.cursor() as cursor:
@@ -134,38 +133,37 @@ def joinAssessmentData(connection):
         DROP TABLE IF EXISTS {dbTargetSchema}.{dbCrossingsTable};
 
         CREATE TABLE {dbTargetSchema}.{dbCrossingsTable} (
+        id serial not null,
         modelled_id uuid,
         assessment_id uuid,
-        disp_num varchar,
         stream_name varchar,
         strahler_order integer,
-        stream_id uuid, 
-        stream_measure numeric,
+        stream_id uuid,
         wshed_name varchar,
-        wshed_priority varchar,
         transport_feature_name varchar,
-        ownership_type varchar,
-        
-        critical_habitat varchar[],
-        
         passability_status varchar,
-        last_inspection date,
-        
+        passability_status_notes varchar,
+
         crossing_status varchar CHECK (crossing_status in ('MODELLED', 'ASSESSED', 'HABITAT_CONFIRMATION', 'DESIGN', 'REMEDIATED')),
         crossing_feature_type varchar CHECK (crossing_feature_type IN ('ROAD', 'RAIL', 'TRAIL')),
         crossing_type varchar,
         crossing_subtype varchar,
-        
-        habitat_quality varchar,
-        year_planned integer,
-        year_complete integer,
-        comments varchar,
-        
+
+        owner varchar,
+        culvert_number varchar,
+        structure_id varchar,
+        date_examined date,
+        examiners varchar,
+        structure_type varchar,
+        culvert_condition varchar,
+        action_items varchar,
+
         geometry geometry(Point, {appconfig.dataSrid}),
         
-        primary key (modelled_id)
+        primary key (id)
         );
 
+        -- add modelled crossings
         INSERT INTO {dbTargetSchema}.{dbCrossingsTable} (
             modelled_id,
             stream_name,
@@ -193,32 +191,67 @@ def joinAssessmentData(connection):
             geometry
         FROM {dbTargetSchema}.{dbModelledCrossingsTable};
 
+        --match assessment data to modelled points
         with match AS (
             SELECT
-                DISTINCT ON (assess.unique_id) assess.unique_id AS unique_id, model.modelled_id AS modelled_id, ST_Distance(model.geometry, assess.geometry) AS dist
+                DISTINCT ON (assess.assessment_id) assess.assessment_id AS assessment_id, model.modelled_id AS modelled_id, ST_Distance(model.geometry, assess.geometry) AS dist
             FROM {dbTargetSchema}.{dbTargetTable} AS assess, {dbTargetSchema}.{dbModelledCrossingsTable} AS model
             WHERE ST_DWithin(model.geometry, assess.geometry, {joinDistance})
-            ORDER BY unique_id, modelled_id, ST_Distance(model.geometry, assess.geometry)
+            ORDER BY assessment_id, modelled_id, ST_Distance(model.geometry, assess.geometry)
             )
         UPDATE {dbTargetSchema}.{dbCrossingsTable}
-        SET assessment_id = a.unique_id
+        SET assessment_id = a.assessment_id
         FROM match AS a WHERE a.modelled_id = {dbTargetSchema}.{dbCrossingsTable}.modelled_id;
 
+        --add any assessment points that could not be matched - just 1 in current assessment data
+        INSERT INTO {dbTargetSchema}.{dbCrossingsTable} (
+            assessment_id,
+            transport_feature_name,
+            passability_status,
+            passability_status_notes,
+            crossing_subtype,
+            culvert_number,
+            structure_id,
+            date_examined,
+            examiners,
+            structure_type,
+            culvert_condition,
+            action_items,
+            geometry
+        )
+        SELECT
+            assessment_id,
+            road,
+            passability_status,
+            passability_status_notes,
+            crossing_subtype,
+            culvert_number,
+            structure_id,
+            date_examined,
+            examiners,
+            structure_type,
+            culvert_condition,
+            action_items,
+            geometry
+        FROM {dbTargetSchema}.{dbTargetTable}
+        WHERE assessment_id NOT IN (SELECT assessment_id FROM {dbTargetSchema}.{dbCrossingsTable} WHERE assessment_id IS NOT NULL);
+
+        
         UPDATE {dbTargetSchema}.{dbCrossingsTable} AS b
-        SET 
-            disp_num = CASE WHEN a.disp_num IS NOT NULL THEN a.disp_num ELSE b.disp_num END,
-            ownership_type = CASE WHEN a.ownership_type IS NOT NULL THEN a.ownership_type ELSE b.ownership_type END,
-            crossing_type = CASE WHEN a.crossing_type IS NOT NULL THEN a.crossing_type ELSE b.crossing_type END,
-            crossing_subtype = CASE WHEN a.crossing_subtype IS NOT NULL THEN a.crossing_subtype ELSE b.crossing_subtype END,
-            crossing_status = CASE WHEN a.crossing_status IS NOT NULL THEN a.crossing_status ELSE b.crossing_status END,
-            last_inspection = CASE WHEN a.last_inspection IS NOT NULL THEN a.last_inspection ELSE b.last_inspection END,
-            passability_status = CASE WHEN a.passability_status IS NOT NULL THEN a.passability_status ELSE b.passability_status END,
-            habitat_quality = CASE WHEN a.habitat_quality IS NOT NULL THEN a.habitat_quality ELSE b.habitat_quality END,
-            year_planned = CASE WHEN a.year_planned IS NOT NULL THEN a.year_planned ELSE b.year_planned END,
-            year_complete = CASE WHEN a.year_complete IS NOT NULL THEN a.year_complete ELSE b.year_complete END,
-            comments = CASE WHEN a.comments IS NOT NULL THEN a.comments ELSE b.comments END
+        SET
+            culvert_number = CASE WHEN a.culvert_number IS NOT NULL THEN a.culvert_number ELSE b.culvert_number END,
+            structure_id = CASE WHEN a.structure_id IS NOT NULL THEN a.structure_id ELSE b.structure_id END,
+            date_examined = CASE WHEN a.date_examined IS NOT NULL THEN a.date_examined ELSE b.date_examined END,
+            examiners = CASE WHEN a.examiners IS NOT NULL THEN a.examiners ELSE b.examiners END,
+            transport_feature_name = CASE WHEN (a.road IS NOT NULL AND a.road IS DISTINCT FROM b.transport_feature_name) THEN a.road ELSE b.transport_feature_name END,
+            structure_type = CASE WHEN a.structure_type IS NOT NULL THEN a.structure_type ELSE b.structure_type END,
+            culvert_condition = CASE WHEN a.culvert_condition IS NOT NULL THEN a.culvert_condition ELSE b.culvert_condition END,
+            passability_status = CASE WHEN a.passability_status IS NOT NULL THEN UPPER(a.passability_status) ELSE b.passability_status END,
+            passability_status_notes = CASE WHEN a.passability_status_notes IS NOT NULL THEN a.passability_status_notes ELSE b.passability_status_notes END,
+            action_items = CASE WHEN a.action_items IS NOT NULL THEN a.action_items ELSE b.action_items END,
+            crossing_status = CASE WHEN a.culvert_number IS NOT NULL THEN 'ASSESSED' ELSE b.crossing_status END
         FROM {dbTargetSchema}.{dbTargetTable} AS a
-        WHERE b.assessment_id = a.unique_id;
+        WHERE b.assessment_id = a.assessment_id;
 
     """
 
@@ -232,35 +265,116 @@ def loadToBarriers(connection):
         DELETE FROM {dbTargetSchema}.{dbBarrierTable} WHERE type = 'stream_crossing';
         
         INSERT INTO {dbTargetSchema}.{dbBarrierTable}(
-            id, modelled_id, assessment_id, snapped_point,
-            type, owner, passability_status, disp_num,
+            modelled_id, assessment_id, snapped_point,
+            type, owner, passability_status, passability_status_notes,
             stream_name, strahler_order, stream_id, 
-            transport_feature_name, critical_habitat,
-            last_inspection, crossing_status,
+            transport_feature_name, crossing_status,
             crossing_feature_type, crossing_type,
-            crossing_subtype, habitat_quality,
-            year_planned, year_complete, comments
+            crossing_subtype, culvert_number,
+            structure_id, date_examined, examiners,
+            structure_type, culvert_condition, action_items
         )
         SELECT 
-            modelled_id, modelled_id, assessment_id, geometry,
-            'stream_crossing', ownership_type, passability_status, disp_num,
+            modelled_id, assessment_id, geometry,
+            'stream_crossing', owner, passability_status, passability_status_notes,
             stream_name, strahler_order, stream_id, 
-            transport_feature_name, critical_habitat,
-            last_inspection, crossing_status,
+            transport_feature_name, crossing_status,
             crossing_feature_type, crossing_type,
-            crossing_subtype, habitat_quality,
-            year_planned, year_complete, comments
+            crossing_subtype, culvert_number,
+            structure_id, date_examined, examiners,
+            structure_type, culvert_condition, action_items
         FROM {dbTargetSchema}.{dbCrossingsTable};
 
-        UPDATE {dbTargetSchema}.{dbBarrierTable} SET wshed_name = (SELECT name FROM {dataSchema}.{dbHuc8Table} WHERE huc_8 = '{dbWatershedId}');
-        UPDATE {dbTargetSchema}.{dbBarrierTable} SET wshed_priority = 
-            CASE
-            WHEN wshed_name = 'WILDHAY RIVER' THEN 1
-            WHEN wshed_name = 'BERLAND RIVER' THEN 2
-            ELSE NULL END;
+        UPDATE {dbTargetSchema}.{dbBarrierTable} SET wshed_name = '{dbWatershedId}';
+        
+        SELECT public.snap_to_network('{dbTargetSchema}', '{dbBarrierTable}', 'original_point', 'snapped_point', '{snapDistance}');
+
+        DELETE FROM {dbTargetSchema}.{dbBarrierTable}
+            WHERE modelled_id IN (
+            'd067a497-3ed4-40ae-8bf3-03b2a3701468',
+            '684384af-e469-44ed-afb5-209a41b8a38a'
+        );
+
+        UPDATE {dbTargetSchema}.{dbBarrierTable}
+            SET passability_status = 'PASSABLE',
+                passability_status_notes = 'Likely partial barrier due to fishway presence'
+            WHERE cabd_id = '04e4fc7c-e418-4fc3-b083-806f0b1f5c3c';
+
+        UPDATE {dbTargetSchema}.{dbBarrierTable}
+            SET passability_status = 'PASSABLE',
+                passability_status_notes = 'Marked as passable by CWF due to upstream spawning observations for Atlantic salmon'
+            WHERE cabd_id IN (
+                '179709a4-6aa7-4545-9271-446adc3f6cd9',
+                'a3da4307-64dc-4fbf-9514-8298429a6bc8',
+                '87aefbb4-6d49-44d7-91ba-65f7447b13f5');
+
+        UPDATE {dbTargetSchema}.{dbBarrierTable}
+            SET passability_status = 'PASSABLE',
+                passability_status_notes = 'Marked as passable by CWF due to upstream spawning observations for Atlantic salmon'
+            WHERE modelled_id IN (
+            '9247ac5e-a030-4d35-9de6-cfb096e4ed3a',
+            'b1bb1547-a108-429d-b89a-13db3cacac0b',
+            'f4c67968-2839-4b05-aa89-2e30ca7506bb',
+            'd067a497-3ed4-40ae-8bf3-03b2a3701468',
+            '5be7c620-f059-4cde-8f9e-d467d51ad956',
+            '99c1df3d-1041-4e49-bbf0-1e26f735479e',
+            'aa505c04-e809-44c5-a3ee-fa97b0fe6ff9',
+            '684384af-e469-44ed-afb5-209a41b8a38a',
+            '5589d332-da33-4664-b78f-cdad70205359',
+            '1d3cb879-0764-47a5-b7be-a561f8db150f',
+            '5b4a85cf-afaf-4de1-8768-f1c50034210c',
+            '1d56009a-f5ec-458e-b512-3b395bb64516',
+            '6b85e3db-27bc-4e69-a2d0-6591283f8e6c',
+            '0ef6f6d3-6ac3-40ae-afa1-1eb3a5a0ae3d',
+            '1bed76ef-cdf1-42f8-bd3e-55d6679f3c92',
+            '93e1210e-75bf-4aa9-94db-9f64987bfc5a',
+            '4f700fa5-dea3-4a2b-960a-c4bbc2931ca4',
+            'c9ce0f64-4c76-40b3-b163-278570f12b8e',
+            'a0d38be9-0de6-4ad1-951a-189805bf2b16',
+            '0590089c-58ce-4bab-8ed4-169472f86c66',
+            'c0f4e178-be9e-4f8a-86f2-07669bacedf8',
+            '8f23b98c-5a8e-4cd0-bb05-3c54b74884eb',
+            '3b6e0948-78ba-4a9a-9992-7b787699dded'
+            );
+        
+        UPDATE {dbTargetSchema}.{dbBarrierTable}
+            SET passability_status = 'PASSABLE',
+                passability_status_notes = 'Marked as passable by CWF due to upstream spawning observations for Atlantic salmon. This may be at least a partial barrier, undersized and improperly installed (bent).'
+            WHERE modelled_id = 'fa057fdd-c88f-4541-ae16-ad49bfdfe706';
 
     """
 
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+    connection.commit()
+
+def matchArchive(connection):
+
+    query = f"""
+        WITH matched AS (
+            SELECT
+            a.id as id,
+            nn.id as archive_id,
+            nn.dist
+            FROM {dbTargetSchema}.{dbBarrierTable} a
+            CROSS JOIN LATERAL
+            (SELECT
+            id,
+            ST_Distance(a.snapped_point, b.snapped_point) as dist
+            FROM {dbTargetSchema}.{dbBarrierTable}_archive b
+            ORDER BY a.snapped_point <-> b.snapped_point
+            LIMIT 1) as nn
+            WHERE nn.dist < 10
+        )
+
+        UPDATE {dbTargetSchema}.{dbBarrierTable} a
+            SET id = m.archive_id
+            FROM matched m
+            WHERE m.id = a.id;
+
+        DROP TABLE {dbTargetSchema}.{dbBarrierTable}_archive;
+
+    """
     with connection.cursor() as cursor:
         cursor.execute(query)
     connection.commit()
@@ -281,7 +395,10 @@ def main():
         joinAssessmentData(conn)
         
         print("  adding joined points to crossings and barriers tables")
-        loadToBarriers(conn)  
+        loadToBarriers(conn)
+
+        # print("  matching to archived barrier ids")
+        # matchArchive(conn)
         
     print("done")
     
