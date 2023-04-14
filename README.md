@@ -61,8 +61,6 @@ The first step is to populate the database with the required data. These load sc
 
 **Main Script**
 
-load_parameters.py [dataFile] -c config.ini -user [username] -password [password]
-
 ## 2 - Watershed Processing
 
 Processing is completed by watershed id. Each watershed is processed into a separate schema in the database. The watershed configuration must be specified in the ini file and the configuration to be used provided to the script (see below).
@@ -146,7 +144,11 @@ These scripts are the individual processing scripts that are used for the waters
 
 As a part of the loading scripts a fish species table is created which contains the fish species of interest for modelling and various modelling parameters. Before processing the watershed these parameters should be reviewed and configured as necessary.
 
-Note: Currently there is no velocity or channel confinement data. These parameters are placeholders for when this data is added. 
+Note: Currently there is no velocity or channel confinement data. These parameters are placeholders for when this data is added.  
+
+**Script**  
+
+load_parameters.py [dataFile] -c config.ini -user [username] -password [password]
 
 ---
 #### 1 - Preprocessing
@@ -542,7 +544,7 @@ Notes:
 3. Starting at the source nodes and walking down the network compute a min_elevation value for each node. This value is the minimum of the node's raw elevation values and the upstream node elevation values.
 4. For each node assign a smoothed elevation of the the average of the max_elevation and min_elevation
 5. For each edge in the network
-  * clip all vertcies elevations so they are no smaller or bigger than the z values at the end nodes
+  * clip all vertices elevations so they are no smaller or bigger than the z values at the end nodes
   * compute min/max elevations for each vertex then average the results to get smoothed value 
 
 <pre>
