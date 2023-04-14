@@ -62,10 +62,6 @@ def computeAccessibility(connection):
                     WHEN (gradient_barrier_down_cnt = 0 and barrier_down_cnt = 0) THEN '{appconfig.Accessibility.ACCESSIBLE.value}'
                     WHEN (gradient_barrier_down_cnt = 0 and barrier_down_cnt > 0) THEN '{appconfig.Accessibility.POTENTIAL.value}'
                     ELSE '{appconfig.Accessibility.NOT.value}' END;
-
-                    --override accessibility where strahler order = 1
-                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-                    SET {code}_accessibility = '{appconfig.Accessibility.NOT.value}' WHERE strahler_order = 1;
                     
                 """
                 with connection.cursor() as cursor2:
