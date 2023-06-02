@@ -46,51 +46,26 @@ def computeAccessibility(connection):
             code = feature[0]
             name = feature[1]
 
-            if code == 'ae': # american eel
-
-                print("  processing " + name)
+            print("  processing " + name)
+            
+            query = f"""
+            
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS {code}_accessibility;
+            
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN {code}_accessibility varchar;
                 
-                query = f"""
+                UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                SET {code}_accessibility = 
+                CASE 
+                WHEN (gradient_barrier_down_cnt = 0 and barrier_down_cnt = 0) THEN '{appconfig.Accessibility.ACCESSIBLE.value}'
+                WHEN (gradient_barrier_down_cnt = 0 and barrier_down_cnt > 0) THEN '{appconfig.Accessibility.POTENTIAL.value}'
+                ELSE '{appconfig.Accessibility.NOT.value}' END;
                 
-                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS {code}_accessibility;
-                
-                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN {code}_accessibility varchar;
-                    
-                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-                    SET {code}_accessibility = 
-                    CASE 
-                    WHEN (gradient_barrier_down_cnt = 0 and barrier_down_cnt = 0) THEN '{appconfig.Accessibility.ACCESSIBLE.value}'
-                    WHEN (gradient_barrier_down_cnt = 0 and barrier_down_cnt > 0) THEN '{appconfig.Accessibility.POTENTIAL.value}'
-                    ELSE '{appconfig.Accessibility.NOT.value}' END;
-                    
-                """
-                with connection.cursor() as cursor2:
-                    cursor2.execute(query)
-                
-                connection.commit()
-
-            else:
-
-                print("  processing " + name)
-                
-                query = f"""
-                
-                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS {code}_accessibility;
-                
-                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN {code}_accessibility varchar;
-                    
-                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-                    SET {code}_accessibility = 
-                    CASE 
-                    WHEN (gradient_barrier_down_cnt = 0 and barrier_down_cnt = 0) THEN '{appconfig.Accessibility.ACCESSIBLE.value}'
-                    WHEN (gradient_barrier_down_cnt = 0 and barrier_down_cnt > 0) THEN '{appconfig.Accessibility.POTENTIAL.value}'
-                    ELSE '{appconfig.Accessibility.NOT.value}' END;
-                    
-                """
-                with connection.cursor() as cursor2:
-                    cursor2.execute(query)
-                
-                connection.commit()
+            """
+            with connection.cursor() as cursor2:
+                cursor2.execute(query)
+            
+            connection.commit()
 
 def main():        
     #--- main program ---
