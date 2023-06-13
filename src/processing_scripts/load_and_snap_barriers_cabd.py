@@ -24,6 +24,7 @@ import subprocess
 import psycopg2 as pg2
 import psycopg2.extras
 import json, urllib.request, requests
+from appconfig import dataSchema
 
 iniSection = appconfig.args.args[0]
 
@@ -198,6 +199,41 @@ def main():
         conn.commit()
         
         print("Loading beaver activity data complete")
+
+        query = f"""
+            SELECT code, name
+            FROM {dataSchema}.{appconfig.fishSpeciesTable};
+        """
+
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            features = cursor.fetchall()
+            
+            for feature in features:
+                code = feature[0]
+                name = feature[1]
+
+                colname = "passability_status_" + code
+                
+                query = f"""
+                    alter table {dbTargetSchema}.{dbBarrierTable} 
+                    add column if not exists {colname} varchar;
+        
+                    update {dbTargetSchema}.{dbBarrierTable}
+                    set {colname} = passability_status;
+                """
+
+                with conn.cursor() as cursor2:
+                    cursor2.execute(query)
+        
+        query = f"""
+            alter table {dbTargetSchema}.{dbBarrierTable} 
+            drop column if exists passability_status;
+        """
+
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+        conn.commit()
 
     print("Loading barrier data complete")
 

@@ -22,6 +22,7 @@
 # from the stream network
 #
 import appconfig
+from appconfig import dataSchema
 
 iniSection = appconfig.args.args[0]
 
@@ -72,9 +73,7 @@ def createTable(connection):
                 strahler_order integer,
                 stream_id uuid, 
                 transport_feature_name varchar,
-                
-                passability_status varchar,
-                
+              
                 crossing_status varchar,
                 crossing_feature_type varchar CHECK (crossing_feature_type IN ('ROAD', 'TRAIL')),
                 crossing_type varchar,
@@ -89,6 +88,29 @@ def createTable(connection):
     
         with connection.cursor() as cursor:
             cursor.execute(query)
+        
+        query = f"""
+            SELECT code, name
+            FROM {dataSchema}.{appconfig.fishSpeciesTable};
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            features = cursor.fetchall()
+            
+            for feature in features:
+                code = feature[0]
+                name = feature[1]
+
+                colname = "passability_status_" + code
+                
+                query = f"""
+                    alter table {dbTargetSchema}.{dbModelledCrossingsTable} 
+                    add column if not exists {colname} varchar;
+                """
+
+                with connection.cursor() as cursor2:
+                    cursor2.execute(query)
     
     else:
         query = f"""
@@ -101,8 +123,6 @@ def createTable(connection):
                 stream_id uuid, 
                 transport_feature_name varchar,
                 
-                passability_status varchar,
-                
                 crossing_status varchar,
                 crossing_feature_type varchar CHECK (crossing_feature_type IN ('ROAD', 'TRAIL')),
                 crossing_type varchar,
@@ -117,6 +137,29 @@ def createTable(connection):
     
         with connection.cursor() as cursor:
             cursor.execute(query)
+
+        query = f"""
+            SELECT code, name
+            FROM {dataSchema}.{appconfig.fishSpeciesTable};
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            features = cursor.fetchall()
+            
+            for feature in features:
+                code = feature[0]
+                name = feature[1]
+
+                colname = "passability_status_" + code
+                
+                query = f"""
+                    alter table {dbTargetSchema}.{dbModelledCrossingsTable} 
+                    add column if not exists {colname} varchar;
+                """
+
+                with connection.cursor() as cursor2:
+                    cursor2.execute(query)
 
 def computeCrossings(connection):
         
@@ -213,14 +256,33 @@ def computeAttributes(connection):
     query = f"""
         UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
         SET crossing_status = 'MODELLED';
-        
-        UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
-        SET passability_status = 'UNKNOWN'
-        WHERE passability_status IS NULL;
     """
-    #print(query)
     with connection.cursor() as cursor:
         cursor.execute(query)
+
+    query = f"""
+        SELECT code, name
+        FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        features = cursor.fetchall()
+        
+        for feature in features:
+            code = feature[0]
+            name = feature[1]
+
+            colname = "passability_status_" + code
+                
+            query = f"""
+                UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
+                SET {colname} = 'UNKNOWN' WHERE {colname} IS NULL;
+            """
+
+            with connection.cursor() as cursor2:
+                cursor2.execute(query)
+
 
 def main():                        
     #--- main program ---    
