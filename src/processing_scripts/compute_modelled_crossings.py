@@ -37,6 +37,17 @@ trailTable = appconfig.config['CREATE_LOAD_SCRIPT']['trail_table']
     
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 
+with appconfig.connectdb() as conn:
+
+    query = f"""
+    SELECT code
+    FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+
+    with conn.cursor() as cursor:
+        cursor.execute(query)
+        specCodes = cursor.fetchall()
+
 def tableExists(connection):
 
     query = f"""
@@ -59,8 +70,8 @@ def createTable(connection):
 
     if result:
 
+        # create an archive table so we can keep modelled_id stable
         query = f"""
-            --create an archive table so we can keep modelled_id stable
             DROP TABLE IF EXISTS {dbTargetSchema}.{dbModelledCrossingsTable}_archive;
             CREATE TABLE {dbTargetSchema}.{dbModelledCrossingsTable}_archive 
             AS SELECT * FROM {dbTargetSchema}.{dbModelledCrossingsTable};
@@ -89,28 +100,19 @@ def createTable(connection):
         with connection.cursor() as cursor:
             cursor.execute(query)
         
-        query = f"""
-            SELECT code, name
-            FROM {dataSchema}.{appconfig.fishSpeciesTable};
-        """
+        # add species-specific passability fields
+        for species in specCodes:
+            code = species[0]
 
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-            features = cursor.fetchall()
+            colname = "passability_status_" + code
             
-            for feature in features:
-                code = feature[0]
-                name = feature[1]
+            query = f"""
+                alter table {dbTargetSchema}.{dbModelledCrossingsTable} 
+                add column if not exists {colname} varchar;
+            """
 
-                colname = "passability_status_" + code
-                
-                query = f"""
-                    alter table {dbTargetSchema}.{dbModelledCrossingsTable} 
-                    add column if not exists {colname} varchar;
-                """
-
-                with connection.cursor() as cursor2:
-                    cursor2.execute(query)
+            with connection.cursor() as cursor:
+                cursor.execute(query)
     
     else:
         query = f"""
@@ -138,28 +140,19 @@ def createTable(connection):
         with connection.cursor() as cursor:
             cursor.execute(query)
 
-        query = f"""
-            SELECT code, name
-            FROM {dataSchema}.{appconfig.fishSpeciesTable};
-        """
+        # add species-specific passability fields 
+        for species in specCodes:
+            code = species[0]
 
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-            features = cursor.fetchall()
+            colname = "passability_status_" + code
             
-            for feature in features:
-                code = feature[0]
-                name = feature[1]
+            query = f"""
+                alter table {dbTargetSchema}.{dbModelledCrossingsTable} 
+                add column if not exists {colname} varchar;
+            """
 
-                colname = "passability_status_" + code
-                
-                query = f"""
-                    alter table {dbTargetSchema}.{dbModelledCrossingsTable} 
-                    add column if not exists {colname} varchar;
-                """
-
-                with connection.cursor() as cursor2:
-                    cursor2.execute(query)
+            with connection.cursor() as cursor:
+                cursor.execute(query)
 
 def computeCrossings(connection):
         
@@ -259,30 +252,19 @@ def computeAttributes(connection):
     """
     with connection.cursor() as cursor:
         cursor.execute(query)
+    
+    for species in specCodes:
+        code = species[0]
 
-    query = f"""
-        SELECT code, name
-        FROM {dataSchema}.{appconfig.fishSpeciesTable};
-    """
+        colname = "passability_status_" + code
+            
+        query = f"""
+            UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
+            SET {colname} = 'UNKNOWN' WHERE {colname} IS NULL;
+        """
 
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-        features = cursor.fetchall()
-        
-        for feature in features:
-            code = feature[0]
-            name = feature[1]
-
-            colname = "passability_status_" + code
-                
-            query = f"""
-                UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
-                SET {colname} = 'UNKNOWN' WHERE {colname} IS NULL;
-            """
-
-            with connection.cursor() as cursor2:
-                cursor2.execute(query)
-
+        with connection.cursor() as cursor:
+            cursor.execute(query)
 
 def main():                        
     #--- main program ---    

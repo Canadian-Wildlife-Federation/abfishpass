@@ -39,6 +39,17 @@ nhnWatershedId = appconfig.config[iniSection]['nhn_watershed_id']
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
 
+with appconfig.connectdb() as conn:
+
+    query = f"""
+    SELECT code
+    FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+
+    with conn.cursor() as cursor:
+        cursor.execute(query)
+        specCodes = cursor.fetchall()
+
 def main():
     
     with appconfig.connectdb() as conn:
@@ -84,7 +95,7 @@ def main():
                 date_examined date,
                 examiners varchar,
                 road varchar,
-                structure_type varchar,
+                culvert_type varchar,
                 culvert_condition varchar,
                 action_items varchar,
 
@@ -200,31 +211,22 @@ def main():
         
         print("Loading beaver activity data complete")
 
-        query = f"""
-            SELECT code, name
-            FROM {dataSchema}.{appconfig.fishSpeciesTable};
-        """
+        # add species-specific passability fields
+        for species in specCodes:
+            code = species[0]
 
-        with conn.cursor() as cursor:
-            cursor.execute(query)
-            features = cursor.fetchall()
+            colname = "passability_status_" + code
             
-            for feature in features:
-                code = feature[0]
-                name = feature[1]
+            query = f"""
+                alter table {dbTargetSchema}.{dbBarrierTable} 
+                add column if not exists {colname} varchar;
+    
+                update {dbTargetSchema}.{dbBarrierTable}
+                set {colname} = passability_status;
+            """
 
-                colname = "passability_status_" + code
-                
-                query = f"""
-                    alter table {dbTargetSchema}.{dbBarrierTable} 
-                    add column if not exists {colname} varchar;
-        
-                    update {dbTargetSchema}.{dbBarrierTable}
-                    set {colname} = passability_status;
-                """
-
-                with conn.cursor() as cursor2:
-                    cursor2.execute(query)
+            with conn.cursor() as cursor:
+                cursor.execute(query)
         
         query = f"""
             alter table {dbTargetSchema}.{dbBarrierTable} 
