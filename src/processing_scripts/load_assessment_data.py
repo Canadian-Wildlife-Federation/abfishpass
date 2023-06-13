@@ -45,9 +45,21 @@ watershedTable = appconfig.config['CREATE_LOAD_SCRIPT']['watershed_table']
 joinDistance = appconfig.config['CROSSINGS']['join_distance']
 snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
 
+with appconfig.connectdb() as conn:
+
+    query = f"""
+    SELECT code
+    FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+
+    with conn.cursor() as cursor:
+        cursor.execute(query)
+        specCodes = cursor.fetchall()
+
 def loadAssessmentData(connection):
         
     # create assessed crossings table
+    # to do - rename this? need to add beaver activity and dam updates
     query = f"""
         DROP TABLE IF EXISTS {dataSchema}.{dbTempTable};
         DROP TABLE IF EXISTS {dbTargetSchema}.{dbTargetTable};
@@ -57,13 +69,11 @@ def loadAssessmentData(connection):
             culvert_number varchar,
             structure_id varchar,
             date_examined date,
-            examiners varchar,
             latitude double precision,
             longitude double precision,
             road varchar,
-            structure_type varchar,
+            culvert_type varchar,
             culvert_condition varchar,
-            passability_status varchar,
             passability_status_notes varchar,
             action_items varchar,
             stream_name varchar,
@@ -80,6 +90,20 @@ def loadAssessmentData(connection):
     with connection.cursor() as cursor:
         cursor.execute(query)
     connection.commit()
+        
+    for species in specCodes:
+        code = species[0]
+
+        colname = "passability_status_" + code
+        
+        query = f"""
+            alter table {dbTargetSchema}.{dbTargetTable} 
+            add column if not exists {colname} varchar;
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+        connection.commit()
 
     # load assessment data
     orgDb="dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost+"' port='"+appconfig.dbPort+"' user='"+appconfig.dbUser+"' password='"+ appconfig.dbPassword+"'"
@@ -88,18 +112,27 @@ def loadAssessmentData(connection):
     # print(pycmd)
     subprocess.run(pycmd)
 
+    colNames = []
+    
+    for species in specCodes:
+        code = species[0]
+
+        col = "passability_status_" + code
+        colNames.append(col)
+    
+    colString = ','.join(colNames)
+        
     query = f"""
         INSERT INTO {dbTargetSchema}.{dbTargetTable} (
             culvert_number,
             structure_id,
             date_examined,
-            examiners,
             latitude,
             longitude,
             road,
-            structure_type,
+            culvert_type,
             culvert_condition,
-            passability_status,
+            {colString},
             passability_status_notes,
             action_items,
             geometry
@@ -108,13 +141,12 @@ def loadAssessmentData(connection):
             culvert_number,
             structure_id,
             date_examined::date,
-            examiners,
             latitude,
             longitude,
             road,
-            structure_type,
+            culvert_type,
             culvert_condition,
-            passability_status,
+            {colString},
             passability_status_notes,
             action_items,
             geometry
@@ -129,6 +161,17 @@ def loadAssessmentData(connection):
 
 def joinAssessmentData(connection):
 
+    newCols = []
+
+    for species in specCodes:
+        code = species[0]
+
+        col = "passability_status_" + code + " varchar"
+        newCols.append(col)
+    
+    colString = ','.join(newCols) # string including column type
+    colStringSimple = colString.replace(" varchar", "") # string without column type
+
     query = f"""
         DROP TABLE IF EXISTS {dbTargetSchema}.{dbCrossingsTable};
 
@@ -141,7 +184,7 @@ def joinAssessmentData(connection):
         stream_id uuid,
         wshed_name varchar,
         transport_feature_name varchar,
-        passability_status varchar,
+        {colString},
         passability_status_notes varchar,
 
         crossing_status varchar CHECK (crossing_status in ('MODELLED', 'ASSESSED', 'HABITAT_CONFIRMATION', 'DESIGN', 'REMEDIATED')),
@@ -153,8 +196,7 @@ def joinAssessmentData(connection):
         culvert_number varchar,
         structure_id varchar,
         date_examined date,
-        examiners varchar,
-        structure_type varchar,
+        culvert_type varchar,
         culvert_condition varchar,
         action_items varchar,
 
@@ -170,7 +212,7 @@ def joinAssessmentData(connection):
             strahler_order,
             stream_id,
             transport_feature_name,
-            passability_status,
+            {colStringSimple},
             crossing_status,
             crossing_feature_type,
             crossing_type,
@@ -183,7 +225,7 @@ def joinAssessmentData(connection):
             strahler_order,
             stream_id,
             transport_feature_name,
-            passability_status,
+            {colStringSimple},
             crossing_status,
             crossing_feature_type,
             crossing_type,
@@ -207,14 +249,13 @@ def joinAssessmentData(connection):
         INSERT INTO {dbTargetSchema}.{dbCrossingsTable} (
             assessment_id,
             transport_feature_name,
-            passability_status,
+            {colStringSimple},
             passability_status_notes,
             crossing_subtype,
             culvert_number,
             structure_id,
             date_examined,
-            examiners,
-            structure_type,
+            culvert_type,
             culvert_condition,
             action_items,
             geometry
@@ -222,14 +263,13 @@ def joinAssessmentData(connection):
         SELECT
             assessment_id,
             road,
-            passability_status,
+            {colStringSimple},
             passability_status_notes,
             crossing_subtype,
             culvert_number,
             structure_id,
             date_examined,
-            examiners,
-            structure_type,
+            culvert_type,
             culvert_condition,
             action_items,
             geometry
@@ -242,11 +282,9 @@ def joinAssessmentData(connection):
             culvert_number = CASE WHEN a.culvert_number IS NOT NULL THEN a.culvert_number ELSE b.culvert_number END,
             structure_id = CASE WHEN a.structure_id IS NOT NULL THEN a.structure_id ELSE b.structure_id END,
             date_examined = CASE WHEN a.date_examined IS NOT NULL THEN a.date_examined ELSE b.date_examined END,
-            examiners = CASE WHEN a.examiners IS NOT NULL THEN a.examiners ELSE b.examiners END,
             transport_feature_name = CASE WHEN (a.road IS NOT NULL AND a.road IS DISTINCT FROM b.transport_feature_name) THEN a.road ELSE b.transport_feature_name END,
-            structure_type = CASE WHEN a.structure_type IS NOT NULL THEN a.structure_type ELSE b.structure_type END,
+            culvert_type = CASE WHEN a.culvert_type IS NOT NULL THEN a.culvert_type ELSE b.culvert_type END,
             culvert_condition = CASE WHEN a.culvert_condition IS NOT NULL THEN a.culvert_condition ELSE b.culvert_condition END,
-            passability_status = CASE WHEN a.passability_status IS NOT NULL THEN UPPER(a.passability_status) ELSE b.passability_status END,
             passability_status_notes = CASE WHEN a.passability_status_notes IS NOT NULL THEN a.passability_status_notes ELSE b.passability_status_notes END,
             action_items = CASE WHEN a.action_items IS NOT NULL THEN a.action_items ELSE b.action_items END,
             crossing_status = CASE WHEN a.culvert_number IS NOT NULL THEN 'ASSESSED' ELSE b.crossing_status END
@@ -259,89 +297,60 @@ def joinAssessmentData(connection):
         cursor.execute(query)
     connection.commit()
 
+    # update species-specific passability fields
+    for species in specCodes:
+        code = species[0]
+        colname = "passability_status_" + code
+
+        query = f"""
+            UPDATE {dbTargetSchema}.{dbCrossingsTable} AS b
+            SET {colname} = CASE WHEN a.{colname} IS NOT NULL THEN UPPER(a.{colname}) ELSE b.{colname} END
+            FROM {dbTargetSchema}.{dbTargetTable} AS a
+            WHERE b.assessment_id = a.assessment_id;
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+
 def loadToBarriers(connection):
+
+    newCols = []
+
+    for species in specCodes:
+        code = species[0]
+
+        col = "passability_status_" + code
+        newCols.append(col)
+    
+    colString = ','.join(newCols)
 
     query = f"""
         DELETE FROM {dbTargetSchema}.{dbBarrierTable} WHERE type = 'stream_crossing';
         
         INSERT INTO {dbTargetSchema}.{dbBarrierTable}(
             modelled_id, assessment_id, snapped_point,
-            type, owner, passability_status, passability_status_notes,
+            type, owner, {colString}, passability_status_notes,
             stream_name, strahler_order, stream_id, 
             transport_feature_name, crossing_status,
             crossing_feature_type, crossing_type,
             crossing_subtype, culvert_number,
-            structure_id, date_examined, examiners,
-            structure_type, culvert_condition, action_items
+            structure_id, date_examined,
+            culvert_type, culvert_condition, action_items
         )
         SELECT 
             modelled_id, assessment_id, geometry,
-            'stream_crossing', owner, passability_status, passability_status_notes,
+            'stream_crossing', owner, {colString}, passability_status_notes,
             stream_name, strahler_order, stream_id, 
             transport_feature_name, crossing_status,
             crossing_feature_type, crossing_type,
             crossing_subtype, culvert_number,
-            structure_id, date_examined, examiners,
-            structure_type, culvert_condition, action_items
+            structure_id, date_examined,
+            culvert_type, culvert_condition, action_items
         FROM {dbTargetSchema}.{dbCrossingsTable};
 
         UPDATE {dbTargetSchema}.{dbBarrierTable} SET wshed_name = '{dbWatershedId}';
         
         SELECT public.snap_to_network('{dbTargetSchema}', '{dbBarrierTable}', 'original_point', 'snapped_point', '{snapDistance}');
-
-        DELETE FROM {dbTargetSchema}.{dbBarrierTable}
-            WHERE modelled_id IN (
-            'd067a497-3ed4-40ae-8bf3-03b2a3701468',
-            '684384af-e469-44ed-afb5-209a41b8a38a'
-        );
-
-        UPDATE {dbTargetSchema}.{dbBarrierTable}
-            SET passability_status = 'PASSABLE',
-                passability_status_notes = 'Likely partial barrier due to fishway presence'
-            WHERE cabd_id = '04e4fc7c-e418-4fc3-b083-806f0b1f5c3c';
-
-        UPDATE {dbTargetSchema}.{dbBarrierTable}
-            SET passability_status = 'PASSABLE',
-                passability_status_notes = 'Marked as passable by CWF due to upstream spawning observations for Atlantic salmon'
-            WHERE cabd_id IN (
-                '179709a4-6aa7-4545-9271-446adc3f6cd9',
-                'a3da4307-64dc-4fbf-9514-8298429a6bc8',
-                '87aefbb4-6d49-44d7-91ba-65f7447b13f5');
-
-        UPDATE {dbTargetSchema}.{dbBarrierTable}
-            SET passability_status = 'PASSABLE',
-                passability_status_notes = 'Marked as passable by CWF due to upstream spawning observations for Atlantic salmon'
-            WHERE modelled_id IN (
-            '9247ac5e-a030-4d35-9de6-cfb096e4ed3a',
-            'b1bb1547-a108-429d-b89a-13db3cacac0b',
-            'f4c67968-2839-4b05-aa89-2e30ca7506bb',
-            'd067a497-3ed4-40ae-8bf3-03b2a3701468',
-            '5be7c620-f059-4cde-8f9e-d467d51ad956',
-            '99c1df3d-1041-4e49-bbf0-1e26f735479e',
-            'aa505c04-e809-44c5-a3ee-fa97b0fe6ff9',
-            '684384af-e469-44ed-afb5-209a41b8a38a',
-            '5589d332-da33-4664-b78f-cdad70205359',
-            '1d3cb879-0764-47a5-b7be-a561f8db150f',
-            '5b4a85cf-afaf-4de1-8768-f1c50034210c',
-            '1d56009a-f5ec-458e-b512-3b395bb64516',
-            '6b85e3db-27bc-4e69-a2d0-6591283f8e6c',
-            '0ef6f6d3-6ac3-40ae-afa1-1eb3a5a0ae3d',
-            '1bed76ef-cdf1-42f8-bd3e-55d6679f3c92',
-            '93e1210e-75bf-4aa9-94db-9f64987bfc5a',
-            '4f700fa5-dea3-4a2b-960a-c4bbc2931ca4',
-            'c9ce0f64-4c76-40b3-b163-278570f12b8e',
-            'a0d38be9-0de6-4ad1-951a-189805bf2b16',
-            '0590089c-58ce-4bab-8ed4-169472f86c66',
-            'c0f4e178-be9e-4f8a-86f2-07669bacedf8',
-            '8f23b98c-5a8e-4cd0-bb05-3c54b74884eb',
-            '3b6e0948-78ba-4a9a-9992-7b787699dded'
-            );
-        
-        UPDATE {dbTargetSchema}.{dbBarrierTable}
-            SET passability_status = 'PASSABLE',
-                passability_status_notes = 'Marked as passable by CWF due to upstream spawning observations for Atlantic salmon. This may be at least a partial barrier, undersized and improperly installed (bent).'
-            WHERE modelled_id = 'fa057fdd-c88f-4541-ae16-ad49bfdfe706';
-
     """
 
     with connection.cursor() as cursor:
@@ -385,7 +394,7 @@ def main():
     with appconfig.connectdb() as conn:
         
         conn.autocommit = False
-        
+
         print("Loading Assessment Data for Stream Crossings")
         
         print("  loading assessment data")
