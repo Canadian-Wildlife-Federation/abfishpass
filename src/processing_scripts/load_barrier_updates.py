@@ -32,11 +32,11 @@ import appconfig
 iniSection = appconfig.args.args[0]
 dbTargetSchema = appconfig.config[iniSection]['output_schema']
 dbWatershedId = appconfig.config[iniSection]['watershed_id']
-rawData = appconfig.config[iniSection]['assessment_data']
+rawData = appconfig.config[iniSection]['barrier_updates']
 dataSchema = appconfig.config['DATABASE']['data_schema']
 
-dbTempTable = 'assessment_data_' + dbWatershedId
-dbTargetTable = appconfig.config['CROSSINGS']['assessed_crossings_table']
+dbTempTable = 'barrier_updates_' + dbWatershedId
+dbTargetTable = appconfig.config['BARRIER_PROCESSING']['barrier_updates_table']
 dbModelledCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
 dbCrossingsTable = appconfig.config['CROSSINGS']['crossings_table']
 
@@ -56,16 +56,17 @@ with appconfig.connectdb() as conn:
         cursor.execute(query)
         specCodes = cursor.fetchall()
 
-def loadAssessmentData(connection):
+def loadBarrierUpdates(connection):
         
     # create assessed crossings table
-    # to do - rename this? need to add beaver activity and dam updates
+    # TO DO: add handling for beaver activity and dam updates
+    # TO DO: add handling for new and deleted points
     query = f"""
         DROP TABLE IF EXISTS {dataSchema}.{dbTempTable};
         DROP TABLE IF EXISTS {dbTargetSchema}.{dbTargetTable};
         
         CREATE TABLE {dbTargetSchema}.{dbTargetTable} (
-            assessment_id uuid default gen_random_uuid(),
+            update_id uuid default gen_random_uuid(),
             culvert_number varchar,
             structure_id varchar,
             date_examined date,
@@ -83,7 +84,7 @@ def loadAssessmentData(connection):
             crossing_status varchar,
             geometry geometry(POINT, {appconfig.dataSrid}),
 
-            primary key (assessment_id)
+            primary key (update_id)
         )
         
     """
@@ -178,7 +179,7 @@ def joinAssessmentData(connection):
         CREATE TABLE {dbTargetSchema}.{dbCrossingsTable} (
         id serial not null,
         modelled_id uuid,
-        assessment_id uuid,
+        update_id uuid,
         stream_name varchar,
         strahler_order integer,
         stream_id uuid,
@@ -236,18 +237,18 @@ def joinAssessmentData(connection):
         --match assessment data to modelled points
         with match AS (
             SELECT
-                DISTINCT ON (assess.assessment_id) assess.assessment_id AS assessment_id, model.modelled_id AS modelled_id, ST_Distance(model.geometry, assess.geometry) AS dist
+                DISTINCT ON (assess.update_id) assess.update_id AS update_id, model.modelled_id AS modelled_id, ST_Distance(model.geometry, assess.geometry) AS dist
             FROM {dbTargetSchema}.{dbTargetTable} AS assess, {dbTargetSchema}.{dbModelledCrossingsTable} AS model
             WHERE ST_DWithin(model.geometry, assess.geometry, {joinDistance})
-            ORDER BY assessment_id, modelled_id, ST_Distance(model.geometry, assess.geometry)
+            ORDER BY update_id, modelled_id, ST_Distance(model.geometry, assess.geometry)
             )
         UPDATE {dbTargetSchema}.{dbCrossingsTable}
-        SET assessment_id = a.assessment_id
+        SET update_id = a.update_id
         FROM match AS a WHERE a.modelled_id = {dbTargetSchema}.{dbCrossingsTable}.modelled_id;
 
         --add any assessment points that could not be matched - just 1 in current assessment data
         INSERT INTO {dbTargetSchema}.{dbCrossingsTable} (
-            assessment_id,
+            update_id,
             transport_feature_name,
             {colStringSimple},
             passability_status_notes,
@@ -261,7 +262,7 @@ def joinAssessmentData(connection):
             geometry
         )
         SELECT
-            assessment_id,
+            update_id,
             road,
             {colStringSimple},
             passability_status_notes,
@@ -274,7 +275,7 @@ def joinAssessmentData(connection):
             action_items,
             geometry
         FROM {dbTargetSchema}.{dbTargetTable}
-        WHERE assessment_id NOT IN (SELECT assessment_id FROM {dbTargetSchema}.{dbCrossingsTable} WHERE assessment_id IS NOT NULL);
+        WHERE update_id NOT IN (SELECT update_id FROM {dbTargetSchema}.{dbCrossingsTable} WHERE update_id IS NOT NULL);
 
         
         UPDATE {dbTargetSchema}.{dbCrossingsTable} AS b
@@ -289,7 +290,7 @@ def joinAssessmentData(connection):
             action_items = CASE WHEN a.action_items IS NOT NULL THEN a.action_items ELSE b.action_items END,
             crossing_status = CASE WHEN a.culvert_number IS NOT NULL THEN 'ASSESSED' ELSE b.crossing_status END
         FROM {dbTargetSchema}.{dbTargetTable} AS a
-        WHERE b.assessment_id = a.assessment_id;
+        WHERE b.update_id = a.update_id;
 
     """
 
@@ -306,7 +307,7 @@ def joinAssessmentData(connection):
             UPDATE {dbTargetSchema}.{dbCrossingsTable} AS b
             SET {colname} = CASE WHEN a.{colname} IS NOT NULL THEN UPPER(a.{colname}) ELSE b.{colname} END
             FROM {dbTargetSchema}.{dbTargetTable} AS a
-            WHERE b.assessment_id = a.assessment_id;
+            WHERE b.update_id = a.update_id;
         """
 
         with connection.cursor() as cursor:
@@ -328,7 +329,7 @@ def loadToBarriers(connection):
         DELETE FROM {dbTargetSchema}.{dbBarrierTable} WHERE type = 'stream_crossing';
         
         INSERT INTO {dbTargetSchema}.{dbBarrierTable}(
-            modelled_id, assessment_id, snapped_point,
+            modelled_id, update_id, snapped_point,
             type, owner, {colString}, passability_status_notes,
             stream_name, strahler_order, stream_id, 
             transport_feature_name, crossing_status,
@@ -338,7 +339,7 @@ def loadToBarriers(connection):
             culvert_type, culvert_condition, action_items
         )
         SELECT 
-            modelled_id, assessment_id, geometry,
+            modelled_id, update_id, geometry,
             'stream_crossing', owner, {colString}, passability_status_notes,
             stream_name, strahler_order, stream_id, 
             transport_feature_name, crossing_status,
@@ -357,37 +358,6 @@ def loadToBarriers(connection):
         cursor.execute(query)
     connection.commit()
 
-def matchArchive(connection):
-
-    query = f"""
-        WITH matched AS (
-            SELECT
-            a.id as id,
-            nn.id as archive_id,
-            nn.dist
-            FROM {dbTargetSchema}.{dbBarrierTable} a
-            CROSS JOIN LATERAL
-            (SELECT
-            id,
-            ST_Distance(a.snapped_point, b.snapped_point) as dist
-            FROM {dbTargetSchema}.{dbBarrierTable}_archive b
-            ORDER BY a.snapped_point <-> b.snapped_point
-            LIMIT 1) as nn
-            WHERE nn.dist < 10
-        )
-
-        UPDATE {dbTargetSchema}.{dbBarrierTable} a
-            SET id = m.archive_id
-            FROM matched m
-            WHERE m.id = a.id;
-
-        DROP TABLE {dbTargetSchema}.{dbBarrierTable}_archive;
-
-    """
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-    connection.commit()
-
 #--- main program ---
 def main():
         
@@ -395,19 +365,14 @@ def main():
         
         conn.autocommit = False
 
-        print("Loading Assessment Data for Stream Crossings")
+        print("Loading Barrier Updates")
+        loadBarrierUpdates(conn)
         
-        print("  loading assessment data")
-        loadAssessmentData(conn)
-        
-        print("  joining assessment points to modelled points")
+        print("  joining update points to barriers")
         joinAssessmentData(conn)
         
-        print("  adding joined points to crossings and barriers tables")
+        print("  adding joined points to barriers tables")
         loadToBarriers(conn)
-
-        # print("  matching to archived barrier ids")
-        # matchArchive(conn)
         
     print("done")
     

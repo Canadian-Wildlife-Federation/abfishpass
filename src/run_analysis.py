@@ -28,7 +28,7 @@ from processing_scripts import preprocess_watershed
 from processing_scripts import load_and_snap_barriers_cabd
 from processing_scripts import load_and_snap_fishobservation
 from processing_scripts import compute_modelled_crossings
-from processing_scripts import load_assessment_data
+from processing_scripts import load_barrier_updates
 from processing_scripts import compute_mainstems
 from processing_scripts import assign_raw_z
 from processing_scripts import smooth_z
@@ -51,7 +51,7 @@ preprocess_watershed.main()
 # load_and_snap_barriers_cabd.main()
 # load_and_snap_fishobservation.main()
 # compute_modelled_crossings.main()
-# load_assessment_data.main()
+# load_barrier_updates.main()
 compute_mainstems.main()
 assign_raw_z.main()
 smooth_z.main()

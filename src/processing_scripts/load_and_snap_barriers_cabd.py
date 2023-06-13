@@ -55,18 +55,13 @@ def main():
     with appconfig.connectdb() as conn:
         # creates barriers table with attributes from CABD and crossings table
         query = f"""
-            --create an archive table so we can keep ids stable
-            --archive table will be used after loading assessment data
-            --DROP TABLE IF EXISTS {dbTargetSchema}.{dbBarrierTable}_archive;
-            --CREATE TABLE {dbTargetSchema}.{dbBarrierTable}_archive AS SELECT * FROM {dbTargetSchema}.{dbBarrierTable};
-            
             DROP TABLE IF EXISTS {dbTargetSchema}.{dbBarrierTable};
 
             create table if not exists {dbTargetSchema}.{dbBarrierTable} (
                 id uuid not null default gen_random_uuid(),
                 cabd_id uuid,
                 modelled_id uuid,
-                assessment_id uuid,
+                update_id uuid,
                 original_point geometry(POINT, {appconfig.dataSrid}),
                 snapped_point geometry(POINT, {appconfig.dataSrid}),
                 name varchar(256),

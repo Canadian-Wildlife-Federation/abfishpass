@@ -27,7 +27,7 @@ from processing_scripts import preprocess_watershed
 from processing_scripts import load_and_snap_barriers_cabd
 from processing_scripts import load_and_snap_fishobservation
 from processing_scripts import compute_modelled_crossings
-from processing_scripts import load_assessment_data
+from processing_scripts import load_barrier_updates
 from processing_scripts import compute_mainstems
 from processing_scripts import assign_raw_z
 from processing_scripts import smooth_z
@@ -50,20 +50,20 @@ preprocess_watershed.main()
 load_and_snap_barriers_cabd.main()
 load_and_snap_fishobservation.main()
 compute_modelled_crossings.main()
-load_assessment_data.main()
-compute_mainstems.main()
-assign_raw_z.main()
-smooth_z.main()
-compute_vertex_gradient.main()
-break_streams_at_barriers.main()
-print ("Recalculating elevations on broken streams: " + workingWatershedId)
-#re-assign elevations to broken streams
-assign_raw_z.main()
-smooth_z.main()
-compute_segment_gradient.main()
-compute_updown_barriers_fish.main()
-compute_accessibility.main()
-assign_habitat.main()
-compute_barriers_upstream_values.main()
+load_barrier_updates.main()
+# compute_mainstems.main()
+# assign_raw_z.main()
+# smooth_z.main()
+# compute_vertex_gradient.main()
+# break_streams_at_barriers.main()
+# print ("Recalculating elevations on broken streams: " + workingWatershedId)
+# #re-assign elevations to broken streams
+# assign_raw_z.main()
+# smooth_z.main()
+# compute_segment_gradient.main()
+# compute_updown_barriers_fish.main()
+# compute_accessibility.main()
+# assign_habitat.main()
+# compute_barriers_upstream_values.main()
 
 print ("Processing Complete: " + workingWatershedId)
