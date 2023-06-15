@@ -24,6 +24,7 @@ import appconfig
 from imagecodecs.imagecodecs import NONE
 
 iniSection = appconfig.args.args[0]
+dataSchema = appconfig.config['DATABASE']['data_schema']
 dbTargetSchema = appconfig.config[iniSection]['output_schema']
 watershed_id = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
@@ -36,13 +37,32 @@ dbVertexTable = appconfig.config['GRADIENT_PROCESSING']['vertex_gradient_table']
 dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['smoothedgeometry_field']
 dbGradientBarrierTable = appconfig.config['BARRIER_PROCESSING']['gradient_barrier_table']
 
+with appconfig.connectdb() as conn:
+
+    query = f"""
+    SELECT code
+    FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+
+    with conn.cursor() as cursor:
+        cursor.execute(query)
+        specCodes = cursor.fetchall()
+
 def breakstreams (conn):
         
-    #find all break points
+    # find all break points
     # all barriers regardless of passability status (dams, modelled crossings, and assessed crossings)
     # all gradient barriers (Vertex gradient > min fish gradient)
     #  -> these are a bit special as we only want to break once for
     #     a segment if vertex gradient continuously large 
+
+    newCols = []
+    for species in specCodes:
+        code = species[0]
+        col = "passability_status_" + code
+        newCols.append(col)
+    colString = ' varchar,'.join(newCols)
+    colStringSimple = ','.join(newCols)
     
     query = f"""
         DROP TABLE IF EXISTS {dbTargetSchema}.{dbGradientBarrierTable};
@@ -51,16 +71,16 @@ def breakstreams (conn):
             point geometry(POINT, {appconfig.dataSrid}),
             id uuid,
             type varchar,
-            passability_status varchar
+            {colString} varchar
             );
     
         -- barriers
-        INSERT INTO {dbTargetSchema}.{dbGradientBarrierTable} (point, id, type, passability_status) 
-            SELECT snapped_point, id, type, passability_status
+        INSERT INTO {dbTargetSchema}.{dbGradientBarrierTable} (point, id, type, {colStringSimple}) 
+            SELECT snapped_point, id, type, {colStringSimple}
             FROM {dbTargetSchema}.{dbBarrierTable};
     """
         
-    #print(query)
+    # print(query)
     with conn.cursor() as cursor:
         cursor.execute(query)
     conn.commit()
@@ -68,8 +88,9 @@ def breakstreams (conn):
     # break at gradient points
 
     query = f"""
-        SELECT min(accessibility_gradient) as minvalue 
+        SELECT accessibility_gradient as minvalue, code
         FROM {appconfig.dataSchema}.{appconfig.fishSpeciesTable}
+        WHERE accessibility_gradient = (SELECT min(accessibility_gradient) FROM {appconfig.dataSchema}.{appconfig.fishSpeciesTable});
     """
     
     mingradient = -1
@@ -78,7 +99,7 @@ def breakstreams (conn):
         cursor.execute(query)
         features = cursor.fetchall()
         mingradient = features[0][0]
-        
+        code = features[0][1]
         
     query = f"""    
         SELECT mainstem_id, st_Force2d(vertex_pnt), gradient
@@ -134,9 +155,22 @@ def breakstreams (conn):
                 # this is a point that is not the first point on a new mainstem 
                 # has a gradient larger than required values
                 # and has a downstream gradient that is less than required values  
-                query = f"""INSERT INTO {dbTargetSchema}.{dbGradientBarrierTable} (point, id, type, passability_status) values ('{point}', gen_random_uuid(), 'gradient_barrier', 'BARRIER');""" 
+                query = f"""INSERT INTO {dbTargetSchema}.{dbGradientBarrierTable} (point, id, type, passability_status_{code}) values ('{point}', gen_random_uuid(), 'gradient_barrier', 'BARRIER');""" 
                 with conn.cursor() as cursor2:
                     cursor2.execute(query)
+                
+                for species in specCodes:
+                    if species[0] != code:
+                        foo = species[0]
+                        col = "passability_status_" + foo
+                        query = f"""
+                            UPDATE {dbTargetSchema}.{dbGradientBarrierTable} SET {col} = 'PASSABLE';
+                        """
+                        with conn.cursor() as cursor2:
+                            cursor2.execute(query)
+                    else:
+                        continue
+                    
             lastmainstem = mainstem
             lastgradient = gradient
             
@@ -268,26 +302,11 @@ def updateBarrier(connection):
             SET stream_id_down = a.stream_id
             FROM ids a
             WHERE a.barrier_id = {dbTargetSchema}.{dbBarrierTable}.id;
-        
-        --update crossing table with same info for consistency
-        
-        ALTER TABLE {dbTargetSchema}.{dbModelledCrossingsTable} DROP COLUMN IF EXISTS stream_id;
-
-        ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} DROP COLUMN IF EXISTS stream_id;
-        ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN IF NOT EXISTS stream_id_up uuid;
-        ALTER TABLE {dbTargetSchema}.{dbCrossingsTable} ADD COLUMN IF NOT EXISTS stream_id_down uuid;
-        UPDATE {dbTargetSchema}.{dbCrossingsTable} SET stream_id_up = null;
-        UPDATE {dbTargetSchema}.{dbCrossingsTable} SET stream_id_down = null;
-
-        UPDATE {dbTargetSchema}.{dbCrossingsTable} AS a
-            SET 
-            stream_id_up = (SELECT stream_id_up FROM {dbTargetSchema}.{dbBarrierTable} AS b WHERE (a.modelled_id = b.modelled_id) OR (a.assessment_id = b.assessment_id)),
-            stream_id_down = (SELECT stream_id_down FROM {dbTargetSchema}.{dbBarrierTable} AS b WHERE (a.modelled_id = b.modelled_id) OR (a.assessment_id = b.assessment_id));
-
     """
     
     with connection.cursor() as cursor:
-        cursor.execute(query)                    
+        cursor.execute(query)
+    connection.commit()           
                         
 def main():
     with appconfig.connectdb() as connection:
