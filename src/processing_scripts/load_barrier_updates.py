@@ -193,20 +193,21 @@ def processUpdates(connection):
     mappingQuery = f"""
         -- new points
         INSERT INTO {dbTargetSchema}.{dbBarrierTable} (
-            id, update_id, original_point, type,
+            update_id, original_point, type,
             {colString}, passability_status_notes,
             culvert_number, structure_id, date_examined,
             transport_feature_name, culvert_type,
             culvert_condition, action_items
             )
         SELECT 
-            gen_random_uuid(), update_id, geometry, barrier_type,
+            DISTINCT update_id, geometry, barrier_type,
             {colString}, passability_status_notes,
             culvert_number, structure_id, date_examined,
             road, culvert_type,
             culvert_condition, action_items
         FROM {dbTargetSchema}.{dbTargetTable}
-        WHERE update_type = 'new feature';
+        WHERE update_type = 'new feature'
+        AND update_status = 'ready';
 
         UPDATE {dbTargetSchema}.{dbTargetTable} SET update_status = 'done' WHERE update_type = 'new feature';
 
@@ -215,6 +216,7 @@ def processUpdates(connection):
         WHERE id IN (
             SELECT barrier_id FROM {dbTargetSchema}.{dbTargetTable}
             WHERE update_type = 'delete feature'
+            AND update_status = 'ready'
             );
         
         UPDATE {dbTargetSchema}.{dbTargetTable} SET update_status = 'done' WHERE update_type = 'delete feature';
