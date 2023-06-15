@@ -17,13 +17,12 @@
 #----------------------------------------------------------------------------------
 
 #
-# This script loads an assessment data file into the database, joins
-# the points to modelled crossings based on a specified buffer distance,
-# loads the joined and modelled points to the crossings table,
-# and finally loads crossing points to the barriers table.
+# This script loads a barrier updates file into the database, and
+# joins these updates to their respective tables. It can add, delete,
+# and modify features of any barrier type.
 #
-# The script assumes assessment data files only contain data for a single
-# HUC 8 watershed.
+# The script assumes the barrier updates file only contains data
+# for a single watershed.
 #
 
 import subprocess
@@ -58,227 +57,182 @@ with appconfig.connectdb() as conn:
 
 def loadBarrierUpdates(connection):
         
-    # create assessed crossings table
-    # TO DO: add handling for beaver activity and dam updates
-    # TO DO: add handling for new and deleted points
-    query = f"""
-        DROP TABLE IF EXISTS {dataSchema}.{dbTempTable};
-        DROP TABLE IF EXISTS {dbTargetSchema}.{dbTargetTable};
-        
-        CREATE TABLE {dbTargetSchema}.{dbTargetTable} (
-            update_id uuid default gen_random_uuid(),
-            culvert_number varchar,
-            structure_id varchar,
-            date_examined date,
-            latitude double precision,
-            longitude double precision,
-            road varchar,
-            culvert_type varchar,
-            culvert_condition varchar,
-            passability_status_notes varchar,
-            action_items varchar,
-            stream_name varchar,
-            "owner" varchar,
-            crossing_type varchar,
-            crossing_subtype varchar,
-            crossing_status varchar,
-            geometry geometry(POINT, {appconfig.dataSrid}),
-
-            primary key (update_id)
-        )
-        
-    """
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-    connection.commit()
-        
-    for species in specCodes:
-        code = species[0]
-
-        colname = "passability_status_" + code
-        
-        query = f"""
-            alter table {dbTargetSchema}.{dbTargetTable} 
-            add column if not exists {colname} varchar;
-        """
-
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-        connection.commit()
-
-    # load assessment data
+    # load updates into a table
     orgDb="dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost+"' port='"+appconfig.dbPort+"' user='"+appconfig.dbUser+"' password='"+ appconfig.dbPassword+"'"
 
-    pycmd = '"' + appconfig.ogr + '" -overwrite -f "PostgreSQL" PG:"' + orgDb + '" -t_srs EPSG:' + appconfig.dataSrid + ' -nln "' + dataSchema + '.' + dbTempTable + '" -lco GEOMETRY_NAME=geometry "' + rawData + '" -oo EMPTY_STRING_AS_NULL=YES'
-    # print(pycmd)
+    pycmd = '"' + appconfig.ogr + '" -overwrite -f "PostgreSQL" PG:"' + orgDb + '" -t_srs EPSG:' + appconfig.dataSrid + ' -nln "' + dbTargetSchema + '.' + dbTargetTable + '" -lco GEOMETRY_NAME=geometry "' + rawData + '" -oo EMPTY_STRING_AS_NULL=YES'
     subprocess.run(pycmd)
 
-    colNames = []
-    
-    for species in specCodes:
-        code = species[0]
-
-        col = "passability_status_" + code
-        colNames.append(col)
-    
-    colString = ','.join(colNames)
-        
     query = f"""
-        INSERT INTO {dbTargetSchema}.{dbTargetTable} (
-            culvert_number,
-            structure_id,
-            date_examined,
-            latitude,
-            longitude,
-            road,
-            culvert_type,
-            culvert_condition,
-            {colString},
-            passability_status_notes,
-            action_items,
-            geometry
-            )
-        SELECT 
-            culvert_number,
-            structure_id,
-            date_examined::date,
-            latitude,
-            longitude,
-            road,
-            culvert_type,
-            culvert_condition,
-            {colString},
-            passability_status_notes,
-            action_items,
-            geometry
-        FROM {dataSchema}.{dbTempTable};
-
-        UPDATE {dbTargetSchema}.{dbTargetTable} SET crossing_subtype = 'culvert' where culvert_number ILIKE '%culvert%';
-
+        ALTER TABLE {dbTargetSchema}.{dbTargetTable} ADD COLUMN update_id uuid default gen_random_uuid();
+        ALTER TABLE {dbTargetSchema}.{dbTargetTable} DROP CONSTRAINT IF EXISTS {dbTargetTable}_pkey;
+        ALTER TABLE {dbTargetSchema}.{dbTargetTable} ADD CONSTRAINT {dbTargetTable}_pkey PRIMARY KEY (update_id);
     """
+    
     with connection.cursor() as cursor:
         cursor.execute(query)
     connection.commit()
 
-def joinAssessmentData(connection):
-
-    newCols = []
-
-    for species in specCodes:
-        code = species[0]
-
-        col = "passability_status_" + code + " varchar"
-        newCols.append(col)
-    
-    colString = ','.join(newCols) # string including column type
-    colStringSimple = colString.replace(" varchar", "") # string without column type
+def joinBarrierUpdates(connection):
 
     query = f"""
-        DROP TABLE IF EXISTS {dbTargetSchema}.{dbCrossingsTable};
+        ALTER TABLE {dbTargetSchema}.{dbTargetTable} ADD COLUMN barrier_id uuid;
+    """
+    
+    with connection.cursor() as cursor:
+        cursor.execute(query)
 
-        CREATE TABLE {dbTargetSchema}.{dbCrossingsTable} (
-        id serial not null,
-        modelled_id uuid,
-        update_id uuid,
-        stream_name varchar,
-        strahler_order integer,
-        stream_id uuid,
-        wshed_name varchar,
-        transport_feature_name varchar,
-        {colString},
-        passability_status_notes varchar,
+    query = f"""
+        SELECT DISTINCT barrier_type
+        FROM {dbTargetSchema}.{dbTargetTable};
+    """
 
-        crossing_status varchar CHECK (crossing_status in ('MODELLED', 'ASSESSED', 'HABITAT_CONFIRMATION', 'DESIGN', 'REMEDIATED')),
-        crossing_feature_type varchar CHECK (crossing_feature_type IN ('ROAD', 'RAIL', 'TRAIL')),
-        crossing_type varchar,
-        crossing_subtype varchar,
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        barrierTypes = cursor.fetchall()
 
-        owner varchar,
-        culvert_number varchar,
-        structure_id varchar,
-        date_examined date,
-        culvert_type varchar,
-        culvert_condition varchar,
-        action_items varchar,
-
-        geometry geometry(Point, {appconfig.dataSrid}),
-        
-        primary key (id)
-        );
-
-        -- add modelled crossings
-        INSERT INTO {dbTargetSchema}.{dbCrossingsTable} (
-            modelled_id,
-            stream_name,
-            strahler_order,
-            stream_id,
-            transport_feature_name,
-            {colStringSimple},
-            crossing_status,
-            crossing_feature_type,
-            crossing_type,
-            crossing_subtype,
-            geometry
-        )
-        SELECT
-            modelled_id,
-            stream_name,
-            strahler_order,
-            stream_id,
-            transport_feature_name,
-            {colStringSimple},
-            crossing_status,
-            crossing_feature_type,
-            crossing_type,
-            crossing_subtype,
-            geometry
-        FROM {dbTargetSchema}.{dbModelledCrossingsTable};
-
-        --match assessment data to modelled points
+    for bType in barrierTypes:
+        barrier = bType[0]
+        query = f"""
         with match AS (
             SELECT
-                DISTINCT ON (assess.update_id) assess.update_id AS update_id, model.modelled_id AS modelled_id, ST_Distance(model.geometry, assess.geometry) AS dist
-            FROM {dbTargetSchema}.{dbTargetTable} AS assess, {dbTargetSchema}.{dbModelledCrossingsTable} AS model
-            WHERE ST_DWithin(model.geometry, assess.geometry, {joinDistance})
-            ORDER BY update_id, modelled_id, ST_Distance(model.geometry, assess.geometry)
+            foo.update_id,
+            closest_point.id,
+            closest_point.dist
+            FROM {dbTargetSchema}.{dbTargetTable} AS foo
+            CROSS JOIN LATERAL 
+            (SELECT
+                id, 
+                ST_Distance(bar.snapped_point, foo.geometry) as dist
+                FROM {dbTargetSchema}.{dbBarrierTable} AS bar
+                WHERE ST_DWithin(bar.snapped_point, foo.geometry, {joinDistance})
+                AND bar.type = '{barrier}'
+                ORDER BY ST_Distance(bar.snapped_point, foo.geometry)
+                LIMIT 1
+            ) AS closest_point
+            WHERE foo.barrier_type = '{barrier}'
             )
-        UPDATE {dbTargetSchema}.{dbCrossingsTable}
-        SET update_id = a.update_id
-        FROM match AS a WHERE a.modelled_id = {dbTargetSchema}.{dbCrossingsTable}.modelled_id;
+        UPDATE {dbTargetSchema}.{dbTargetTable}
+        SET barrier_id = a.id
+        FROM match AS a WHERE a.update_id = {dbTargetSchema}.{dbTargetTable}.update_id;
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+    
+    connection.commit()
 
-        --add any assessment points that could not be matched - just 1 in current assessment data
-        INSERT INTO {dbTargetSchema}.{dbCrossingsTable} (
-            update_id,
-            transport_feature_name,
-            {colStringSimple},
-            passability_status_notes,
-            crossing_subtype,
-            culvert_number,
-            structure_id,
-            date_examined,
-            culvert_type,
-            culvert_condition,
-            action_items,
-            geometry
+def processUpdates(connection):
+
+    def processMultiple(connection):
+
+        # where multiple updates exist for a feature, only update one at a time
+        waitCount = 0
+        waitQuery = f"""SELECT COUNT(*) FROM {dbTargetSchema}.{dbTargetTable} WHERE update_status = 'wait'"""
+
+        while(True):
+            with connection.cursor() as cursor:
+                cursor.execute(initializeQuery)
+                cursor.execute(waitQuery)
+                waitCount = int(cursor.fetchone()[0])
+                print("   ", waitCount, "updates are waiting to be made...")
+
+                # update most fields
+                cursor.execute(mappingQuery)
+                # update species-specific passability fields
+                for species in specCodes:
+                    code = species[0]
+                    colname = "passability_status_" + code
+                    passabilityQuery = f"""
+                        UPDATE {dbTargetSchema}.{dbBarrierTable} AS b
+                        SET {colname} = CASE WHEN a.{colname} IS NOT NULL THEN UPPER(a.{colname}) ELSE b.{colname} END
+                        FROM {dbTargetSchema}.{dbTargetTable} AS a
+                        WHERE b.id = a.barrier_id
+                        AND a.update_status = 'ready';
+                    """
+                    cursor.execute(passabilityQuery)
+
+                query = f"""
+                    UPDATE {dbTargetSchema}.{dbTargetTable} SET update_status = 'done' WHERE update_status = 'ready';
+                    UPDATE {dbTargetSchema}.{dbTargetTable} SET update_status = 'ready' WHERE update_status = 'wait';
+                """
+                cursor.execute(query)
+            
+                connection.commit()
+
+            if waitCount == 0:
+                break
+
+    query = f"""
+        ALTER TABLE {dbTargetSchema}.{dbTargetTable} ADD COLUMN update_status varchar;
+        UPDATE {dbTargetSchema}.{dbTargetTable} SET update_status = 'ready';
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+    
+    initializeQuery = f"""
+        WITH cte AS (
+        SELECT update_id, barrier_id,
+            row_number() OVER(PARTITION BY barrier_id ORDER BY update_date ASC) AS rn
+        FROM {dbTargetSchema}.{dbTargetTable} WHERE update_status = 'ready'
+        AND update_type = 'modify feature'
         )
-        SELECT
-            update_id,
-            road,
-            {colStringSimple},
-            passability_status_notes,
-            crossing_subtype,
-            culvert_number,
-            structure_id,
-            date_examined,
-            culvert_type,
-            culvert_condition,
-            action_items,
-            geometry
-        FROM {dbTargetSchema}.{dbTargetTable}
-        WHERE update_id NOT IN (SELECT update_id FROM {dbTargetSchema}.{dbCrossingsTable} WHERE update_id IS NOT NULL);
+        UPDATE {dbTargetSchema}.{dbTargetTable}
+        SET update_status = 'wait'
+            WHERE update_id IN (SELECT update_id FROM cte WHERE rn > 1);
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(initializeQuery)
 
+    newCols = []
+    for species in specCodes:
+        code = species[0]
+        col = "passability_status_" + code
+        newCols.append(col)
+    colString = ','.join(newCols)
+
+    mappingQuery = f"""
+        -- new points
+        INSERT INTO {dbTargetSchema}.{dbBarrierTable} (
+            id, update_id, original_point, type,
+            {colString}, passability_status_notes,
+            culvert_number, structure_id, date_examined,
+            transport_feature_name, culvert_type,
+            culvert_condition, action_items
+            )
+        SELECT 
+            gen_random_uuid(), update_id, geometry, barrier_type,
+            {colString}, passability_status_notes,
+            culvert_number, structure_id, date_examined,
+            road, culvert_type,
+            culvert_condition, action_items
+        FROM {dbTargetSchema}.{dbTargetTable}
+        WHERE update_type = 'new feature';
+
+        UPDATE {dbTargetSchema}.{dbTargetTable} SET update_status = 'done' WHERE update_type = 'new feature';
+
+        -- deleted points
+        DELETE FROM {dbTargetSchema}.{dbBarrierTable}
+        WHERE id IN (
+            SELECT barrier_id FROM {dbTargetSchema}.{dbTargetTable}
+            WHERE update_type = 'delete feature'
+            );
         
-        UPDATE {dbTargetSchema}.{dbCrossingsTable} AS b
+        UPDATE {dbTargetSchema}.{dbTargetTable} SET update_status = 'done' WHERE update_type = 'delete feature';
+
+        SELECT public.snap_to_network('{dbTargetSchema}', '{dbBarrierTable}', 'original_point', 'snapped_point', '{snapDistance}');
+        UPDATE {dbTargetSchema}.{dbBarrierTable} SET snapped_point = original_point WHERE snapped_point IS NULL;
+
+        -- updated points
+        UPDATE {dbTargetSchema}.{dbBarrierTable} AS b SET update_id = 
+            CASE
+            WHEN b.update_id IS NULL THEN a.update_id::varchar
+            WHEN b.update_id IS NOT NULL THEN b.update_id::varchar || ',' || a.update_id::varchar
+            ELSE NULL END
+            FROM {dbTargetSchema}.{dbTargetTable} AS a
+            WHERE b.id = a.barrier_id
+            AND a.update_status = 'ready';
+
+        UPDATE {dbTargetSchema}.{dbBarrierTable} AS b
         SET
             culvert_number = CASE WHEN a.culvert_number IS NOT NULL THEN a.culvert_number ELSE b.culvert_number END,
             structure_id = CASE WHEN a.structure_id IS NOT NULL THEN a.structure_id ELSE b.structure_id END,
@@ -286,77 +240,19 @@ def joinAssessmentData(connection):
             transport_feature_name = CASE WHEN (a.road IS NOT NULL AND a.road IS DISTINCT FROM b.transport_feature_name) THEN a.road ELSE b.transport_feature_name END,
             culvert_type = CASE WHEN a.culvert_type IS NOT NULL THEN a.culvert_type ELSE b.culvert_type END,
             culvert_condition = CASE WHEN a.culvert_condition IS NOT NULL THEN a.culvert_condition ELSE b.culvert_condition END,
-            passability_status_notes = CASE WHEN a.passability_status_notes IS NOT NULL THEN a.passability_status_notes ELSE b.passability_status_notes END,
+            passability_status_notes =
+                CASE
+                WHEN a.passability_status_notes IS NOT NULL AND b.passability_status_notes IS NULL THEN a.passability_status_notes
+                WHEN a.passability_status_notes IS NOT NULL AND b.passability_status_notes IS NOT NULL THEN b.passability_status_notes || ';' || a.passability_status_notes
+                ELSE b.passability_status_notes END,
             action_items = CASE WHEN a.action_items IS NOT NULL THEN a.action_items ELSE b.action_items END,
-            crossing_status = CASE WHEN a.culvert_number IS NOT NULL THEN 'ASSESSED' ELSE b.crossing_status END
+            crossing_subtype = CASE WHEN a.crossing_subtype IS NOT NULL THEN a.crossing_subtype ELSE b.crossing_subtype END
         FROM {dbTargetSchema}.{dbTargetTable} AS a
-        WHERE b.update_id = a.update_id;
-
+        WHERE b.id = a.barrier_id
+        AND a.update_status = 'ready';
     """
 
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-    connection.commit()
-
-    # update species-specific passability fields
-    for species in specCodes:
-        code = species[0]
-        colname = "passability_status_" + code
-
-        query = f"""
-            UPDATE {dbTargetSchema}.{dbCrossingsTable} AS b
-            SET {colname} = CASE WHEN a.{colname} IS NOT NULL THEN UPPER(a.{colname}) ELSE b.{colname} END
-            FROM {dbTargetSchema}.{dbTargetTable} AS a
-            WHERE b.update_id = a.update_id;
-        """
-
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-
-def loadToBarriers(connection):
-
-    newCols = []
-
-    for species in specCodes:
-        code = species[0]
-
-        col = "passability_status_" + code
-        newCols.append(col)
-    
-    colString = ','.join(newCols)
-
-    query = f"""
-        DELETE FROM {dbTargetSchema}.{dbBarrierTable} WHERE type = 'stream_crossing';
-        
-        INSERT INTO {dbTargetSchema}.{dbBarrierTable}(
-            modelled_id, update_id, snapped_point,
-            type, owner, {colString}, passability_status_notes,
-            stream_name, strahler_order, stream_id, 
-            transport_feature_name, crossing_status,
-            crossing_feature_type, crossing_type,
-            crossing_subtype, culvert_number,
-            structure_id, date_examined,
-            culvert_type, culvert_condition, action_items
-        )
-        SELECT 
-            modelled_id, update_id, geometry,
-            'stream_crossing', owner, {colString}, passability_status_notes,
-            stream_name, strahler_order, stream_id, 
-            transport_feature_name, crossing_status,
-            crossing_feature_type, crossing_type,
-            crossing_subtype, culvert_number,
-            structure_id, date_examined,
-            culvert_type, culvert_condition, action_items
-        FROM {dbTargetSchema}.{dbCrossingsTable};
-
-        UPDATE {dbTargetSchema}.{dbBarrierTable} SET wshed_name = '{dbWatershedId}';
-        
-        SELECT public.snap_to_network('{dbTargetSchema}', '{dbBarrierTable}', 'original_point', 'snapped_point', '{snapDistance}');
-    """
-
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-    connection.commit()
+    processMultiple(connection)
 
 #--- main program ---
 def main():
@@ -369,10 +265,10 @@ def main():
         loadBarrierUpdates(conn)
         
         print("  joining update points to barriers")
-        joinAssessmentData(conn)
+        joinBarrierUpdates(conn)
         
-        print("  adding joined points to barriers tables")
-        loadToBarriers(conn)
+        print("  processing updates")
+        processUpdates(conn)
         
     print("done")
     

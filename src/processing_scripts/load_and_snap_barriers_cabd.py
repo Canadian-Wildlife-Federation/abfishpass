@@ -61,7 +61,7 @@ def main():
                 id uuid not null default gen_random_uuid(),
                 cabd_id uuid,
                 modelled_id uuid,
-                update_id uuid,
+                update_id varchar,
                 original_point geometry(POINT, {appconfig.dataSrid}),
                 snapped_point geometry(POINT, {appconfig.dataSrid}),
                 name varchar(256),
@@ -88,7 +88,6 @@ def main():
                 culvert_number varchar,
                 structure_id varchar,
                 date_examined date,
-                examiners varchar,
                 road varchar,
                 culvert_type varchar,
                 culvert_condition varchar,
@@ -191,7 +190,7 @@ def main():
                 type)
             SELECT
                 ST_Force2D(geometry),
-                'UNKNOWN',
+                'BARRIER',
                 'beaver_activity'
             FROM
                 {dbTargetSchema}.{dbTempTable};

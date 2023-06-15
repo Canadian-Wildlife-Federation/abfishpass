@@ -27,6 +27,7 @@ from appconfig import dataSchema
 iniSection = appconfig.args.args[0]
 
 dbTargetSchema = appconfig.config[iniSection]['output_schema']
+dbWatershedId = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbModelledCrossingsTable = appconfig.config['CROSSINGS']['modelled_crossings_table']
@@ -36,6 +37,7 @@ railTable = appconfig.config['CREATE_LOAD_SCRIPT']['rail_table']
 trailTable = appconfig.config['CREATE_LOAD_SCRIPT']['trail_table']
     
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
+snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
 
 with appconfig.connectdb() as conn:
 
@@ -266,6 +268,47 @@ def computeAttributes(connection):
         with connection.cursor() as cursor:
             cursor.execute(query)
 
+def loadToBarriers(connection):
+
+    newCols = []
+
+    for species in specCodes:
+        code = species[0]
+
+        col = "passability_status_" + code
+        newCols.append(col)
+    
+    colString = ','.join(newCols)
+
+    query = f"""
+        DELETE FROM {dbTargetSchema}.{dbBarrierTable} WHERE type = 'stream_crossing';
+        
+        INSERT INTO {dbTargetSchema}.{dbBarrierTable}(
+            modelled_id, snapped_point,
+            type, {colString},
+            stream_name, strahler_order, stream_id, 
+            transport_feature_name, crossing_status,
+            crossing_feature_type, crossing_type,
+            crossing_subtype
+        )
+        SELECT 
+            modelled_id, geometry,
+            'stream_crossing', {colString},
+            stream_name, strahler_order, stream_id, 
+            transport_feature_name, crossing_status,
+            crossing_feature_type, crossing_type,
+            crossing_subtype
+        FROM {dbTargetSchema}.{dbModelledCrossingsTable};
+
+        UPDATE {dbTargetSchema}.{dbBarrierTable} SET wshed_name = '{dbWatershedId}';
+        
+        SELECT public.snap_to_network('{dbTargetSchema}', '{dbBarrierTable}', 'original_point', 'snapped_point', '{snapDistance}');
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+    connection.commit()
+
 def main():                        
     #--- main program ---    
     with appconfig.connectdb() as conn:
@@ -293,6 +336,9 @@ def main():
 
             print("  calculating modelled crossing attributes")
             computeAttributes(conn)
+
+            print("  loading to barriers table")
+            loadToBarriers(conn)
             
             conn.commit()
         
@@ -305,6 +351,9 @@ def main():
 
             print("  calculating modelled crossing attributes")
             computeAttributes(conn)
+
+            print("  loading to barriers table")
+            loadToBarriers(conn)
             
             conn.commit()
                 
