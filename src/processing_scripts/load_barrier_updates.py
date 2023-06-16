@@ -73,6 +73,15 @@ def loadBarrierUpdates(connection):
         cursor.execute(query)
     connection.commit()
 
+    for species in specCodes:
+        code = species[0]
+        colname = "passability_status_" + code
+        query = f"""ALTER TABLE {dbTargetSchema}.{dbTargetTable} ALTER COLUMN {colname} TYPE numeric USING {colname}::numeric;
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+    connection.commit()
+
 def joinBarrierUpdates(connection):
 
     query = f"""
@@ -144,7 +153,7 @@ def processUpdates(connection):
                     colname = "passability_status_" + code
                     passabilityQuery = f"""
                         UPDATE {dbTargetSchema}.{dbBarrierTable} AS b
-                        SET {colname} = CASE WHEN a.{colname} IS NOT NULL THEN UPPER(a.{colname}) ELSE b.{colname} END
+                        SET {colname} = CASE WHEN a.{colname} IS NOT NULL THEN a.{colname} ELSE b.{colname} END
                         FROM {dbTargetSchema}.{dbTargetTable} AS a
                         WHERE b.id = a.barrier_id
                         AND a.update_status = 'ready';
@@ -189,9 +198,6 @@ def processUpdates(connection):
         col = "passability_status_" + code
         newCols.append(col)
     colString = ','.join(newCols)
-    prefix = "UPPER("
-    suffix = ")"
-    colStringUpper = ','.join([f'{prefix}{col}{suffix}' for col in newCols])
 
     mappingQuery = f"""
         -- new points
@@ -204,7 +210,7 @@ def processUpdates(connection):
             )
         SELECT 
             update_id, geometry, barrier_type,
-            {colStringUpper}, passability_status_notes,
+            {colString}, passability_status_notes,
             culvert_number, structure_id, date_examined,
             road, culvert_type,
             culvert_condition, action_items

@@ -206,10 +206,16 @@ def main():
             
             query = f"""
                 alter table {dbTargetSchema}.{dbBarrierTable} 
-                add column if not exists {colname} varchar;
+                add column if not exists {colname} numeric;
     
                 update {dbTargetSchema}.{dbBarrierTable}
-                set {colname} = passability_status;
+                set {colname} = 
+                    CASE
+                    WHEN passability_status = 'BARRIER' THEN 0
+                    WHEN passability_status = 'UNKNOWN' THEN 0
+                    WHEN passability_status = 'PARTIAL BARRIER' THEN 0.5
+                    WHEN passability_status = 'PASSABLE' THEN 1
+                    ELSE NULL END;
             """
 
             with conn.cursor() as cursor:

@@ -110,7 +110,7 @@ def createTable(connection):
             
             query = f"""
                 alter table {dbTargetSchema}.{dbModelledCrossingsTable} 
-                add column if not exists {colname} varchar;
+                add column if not exists {colname} numeric;
             """
 
             with connection.cursor() as cursor:
@@ -150,7 +150,7 @@ def createTable(connection):
             
             query = f"""
                 alter table {dbTargetSchema}.{dbModelledCrossingsTable} 
-                add column if not exists {colname} varchar;
+                add column if not exists {colname} numeric;
             """
 
             with connection.cursor() as cursor:
@@ -262,7 +262,7 @@ def computeAttributes(connection):
             
         query = f"""
             UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
-            SET {colname} = 'UNKNOWN' WHERE {colname} IS NULL;
+            SET {colname} = 1 WHERE {colname} IS NULL;
         """
 
         with connection.cursor() as cursor:

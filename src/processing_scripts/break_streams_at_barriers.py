@@ -61,7 +61,7 @@ def breakstreams (conn):
         code = species[0]
         col = "passability_status_" + code
         newCols.append(col)
-    colString = ' varchar,'.join(newCols)
+    colString = ' numeric,'.join(newCols)
     colStringSimple = ','.join(newCols)
     
     query = f"""
@@ -71,7 +71,7 @@ def breakstreams (conn):
             point geometry(POINT, {appconfig.dataSrid}),
             id uuid,
             type varchar,
-            {colString} varchar
+            {colString} numeric
             );
     
         -- barriers
@@ -155,16 +155,17 @@ def breakstreams (conn):
                 # this is a point that is not the first point on a new mainstem 
                 # has a gradient larger than required values
                 # and has a downstream gradient that is less than required values  
-                query = f"""INSERT INTO {dbTargetSchema}.{dbGradientBarrierTable} (point, id, type, passability_status_{code}) values ('{point}', gen_random_uuid(), 'gradient_barrier', 'BARRIER');""" 
+                query = f"""INSERT INTO {dbTargetSchema}.{dbGradientBarrierTable} (point, id, type, passability_status_{code}) values ('{point}', gen_random_uuid(), 'gradient_barrier', 0);""" 
                 with conn.cursor() as cursor2:
                     cursor2.execute(query)
                 
+                # set gradient barriers to be passable for all other species
                 for species in specCodes:
                     if species[0] != code:
                         foo = species[0]
                         col = "passability_status_" + foo
                         query = f"""
-                            UPDATE {dbTargetSchema}.{dbGradientBarrierTable} SET {col} = 'PASSABLE';
+                            UPDATE {dbTargetSchema}.{dbGradientBarrierTable} SET {col} = 1;
                         """
                         with conn.cursor() as cursor2:
                             cursor2.execute(query)
