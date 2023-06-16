@@ -93,13 +93,6 @@ def main():
                 culvert_condition varchar,
                 action_items varchar,
 
-                barriers_upstr varchar[],
-                barriers_downstr varchar[],
-                barrier_cnt_upstr integer,
-                barrier_cnt_downstr integer,
-                gradient_barrier_cnt_upstr integer,
-                gradient_barrier_cnt_downstr integer,
-
                 primary key (id)
             );
             

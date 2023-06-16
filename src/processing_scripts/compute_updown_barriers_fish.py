@@ -28,6 +28,7 @@ import psycopg2.extras
 iniSection = appconfig.args.args[0]
 
 dbTargetSchema = appconfig.config[iniSection]['output_schema']
+dataSchema = appconfig.config['DATABASE']['data_schema']
 watershed_id = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
@@ -37,6 +38,17 @@ snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
 
 edges = []
 nodes = dict()
+
+with appconfig.connectdb() as conn:
+
+    query = f"""
+    SELECT code, name
+    FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+
+    with conn.cursor() as cursor:
+        cursor.execute(query)
+        specCodes = cursor.fetchall()
 
 class Node:
     
@@ -68,7 +80,7 @@ class Edge:
         self.upgradient = set()
         self.downgradient = set()
         
-def createNetwork(connection):
+def createNetwork(connection, code):
     
     query = f"""
         SELECT a.{appconfig.dbIdField} as id, a.{appconfig.dbGeomField}
@@ -117,13 +129,13 @@ def createNetwork(connection):
         from {dbTargetSchema}.{dbBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
         where b.geometry && st_buffer(a.snapped_point, 0.01)
             and st_distance(st_startpoint(b.geometry), a.snapped_point) < 0.01
-            and a.passability_status != 'PASSABLE'
+            and a.passability_status_{code} != 'PASSABLE'
         union 
         select 'down', a.id, b.id 
         from {dbTargetSchema}.{dbBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
         where b.geometry && st_buffer(a.snapped_point, 0.01)
             and st_distance(st_endpoint(b.geometry), a.snapped_point) < 0.01
-            and a.passability_status != 'PASSABLE'       
+            and a.passability_status_{code} != 'PASSABLE'       
     """
    
     #load geometries and create a network
@@ -151,12 +163,14 @@ def createNetwork(connection):
         where b.geometry && st_buffer(a.point, 0.01)
             and st_distance(st_startpoint(b.geometry), a.point) < 0.01
             and a.type = 'gradient_barrier'
+            and a.passability_status_{code} != 'PASSABLE'    
         union 
         select 'down', a.id, b.id 
         from {dbTargetSchema}.{dbGradientBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
         where b.geometry && st_buffer(a.point, 0.01)
             and st_distance(st_endpoint(b.geometry), a.point) < 0.01
-            and a.type = 'gradient_barrier'     
+            and a.type = 'gradient_barrier'
+            and a.passability_status_{code} != 'PASSABLE'
     """
    
     #load geometries and create a network
@@ -263,16 +277,16 @@ def processNodes():
                     toprocess.append(inedge.fromNode)
     
         
-def writeResults(connection):
+def writeResults(connection, code):
       
     updatequery = f"""
         UPDATE {dbTargetSchema}.{dbTargetStreamTable} SET 
-            barrier_up_cnt = %s,
-            barrier_down_cnt = %s,
-            barriers_up = %s,
-            barriers_down = %s,
-            gradient_barrier_up_cnt = %s,
-            gradient_barrier_down_cnt = %s
+            barrier_up_{code}_cnt = %s,
+            barrier_down_{code}_cnt = %s,
+            barriers_up_{code} = %s,
+            barriers_down_{code} = %s,
+            gradient_barrier_up_{code}_cnt = %s,
+            gradient_barrier_down_{code}_cnt = %s
             
         WHERE id = %s;
     """
@@ -295,47 +309,51 @@ def writeResults(connection):
 #--- main program ---
 def main():
     
-    edges.clear()
-    nodes.clear()
-        
     with appconfig.connectdb() as conn:
-        
-        conn.autocommit = False
-        
-        print("Computing Upstream/Downstream Barriers")
-        print("  creating output column")
-        #add a new geometry column for output removing existing one
-        query = f"""
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barrier_up_cnt;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barrier_down_cnt;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barriers_up;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barriers_down;
 
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS gradient_barrier_up_cnt;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS gradient_barrier_down_cnt;
-            
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barrier_up_cnt int;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barrier_down_cnt int;
-            
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_up varchar[];
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_down varchar[];
+        for species in specCodes:
+            code = species[0]
+            name = species[1]
+        
+            conn.autocommit = False
 
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN gradient_barrier_up_cnt int;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN gradient_barrier_down_cnt int;
+            edges.clear()
+            nodes.clear()
             
-        """
-        
-        with conn.cursor() as cursor:
-            cursor.execute(query)
-        
-        print("  creating network")
-        createNetwork(conn)
-        
-        print("  processing nodes")
-        processNodes()
+            print("Computing Upstream/Downstream Barriers")
+            print("  processing barriers for", name)
+            print("  creating output column")
+
+            query = f"""
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barrier_up_{code}_cnt;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barrier_down_{code}_cnt;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barriers_up_{code};
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barriers_down_{code};
+
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS gradient_barrier_up_{code}_cnt;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS gradient_barrier_down_{code}_cnt;
+                
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barrier_up_{code}_cnt int;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barrier_down_{code}_cnt int;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_up_{code} varchar[];
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_down_{code} varchar[];
+
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN gradient_barrier_up_{code}_cnt int;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN gradient_barrier_down_{code}_cnt int;
+                
+            """
             
-        print("  writing results")
-        writeResults(conn)
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+            
+            print("  creating network")
+            createNetwork(conn, code)
+            
+            print("  processing nodes")
+            processNodes()
+                
+            print("  writing results")
+            writeResults(conn, code)
         
     print("done")
     

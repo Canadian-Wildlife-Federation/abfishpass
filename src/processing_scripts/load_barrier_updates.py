@@ -189,6 +189,9 @@ def processUpdates(connection):
         col = "passability_status_" + code
         newCols.append(col)
     colString = ','.join(newCols)
+    prefix = "UPPER("
+    suffix = ")"
+    colStringUpper = ','.join([f'{prefix}{col}{suffix}' for col in newCols])
 
     mappingQuery = f"""
         -- new points
@@ -200,8 +203,8 @@ def processUpdates(connection):
             culvert_condition, action_items
             )
         SELECT 
-            DISTINCT update_id, geometry, barrier_type,
-            {colString}, passability_status_notes,
+            update_id, geometry, barrier_type,
+            {colStringUpper}, passability_status_notes,
             culvert_number, structure_id, date_examined,
             road, culvert_type,
             culvert_condition, action_items

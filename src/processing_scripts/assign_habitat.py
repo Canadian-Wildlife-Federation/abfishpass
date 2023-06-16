@@ -68,6 +68,20 @@ def computeHabitatModel(connection):
                     cursor2.execute(query)
                 connection.commit()
             
+            elif code == 'bt': # brook trout
+
+                query = f"""
+                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS {colname};
+                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN IF NOT EXISTS {colname} boolean;
+                    
+                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                        SET {colname} = true;
+                    
+                """
+                with connection.cursor() as cursor2:
+                    cursor2.execute(query)
+                connection.commit()
+            
             elif code == 'ae': # american eel
 
                 query = f"""
@@ -134,6 +148,20 @@ def computeHabitatModel(connection):
             print("     processing " + name)
 
             if code == 'as': # atlantic salmon
+
+                query = f"""
+                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS {colname};
+                    ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN IF NOT EXISTS {colname} boolean;
+                    
+                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
+                        SET {colname} = true;
+                    
+                """
+                with connection.cursor() as cursor2:
+                    cursor2.execute(query)
+                connection.commit()
+            
+            elif code == 'bt': # brook trout
 
                 query = f"""
                     ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS {colname};
