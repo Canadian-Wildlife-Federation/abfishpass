@@ -84,10 +84,13 @@ class Edge:
         self.rear_funchabitatup_all = {}
         self.funchabitatup_all = {}
 
-        self.upbarriercnt = 0
+        # self.upbarriercnt = 0
+        self.upbarriercnt = {}
     
     def print(self):
         print("fid:", self.fid)
+        print("upbarriercnt:", self.upbarriercnt)
+        print("species accessibility:", self.speca)
         print("spawn_habitat:", self.spawn_habitat)
         print("rear_habitat:", self.rear_habitat)
         print("habitat:", self.habitat)
@@ -112,17 +115,16 @@ class Edge:
 
 def createNetwork(connection):
     
-    
     query = f"""
         SELECT a.code
         FROM {appconfig.dataSchema}.{appconfig.fishSpeciesTable} a
     """
     
-
     accessibilitymodel = ''
     spawnhabitatmodel = ''
     rearhabitatmodel = ''
     habitatmodel = ''
+    barriermodel = ''
     with connection.cursor() as cursor:
         cursor.execute(query)
         features = cursor.fetchall()
@@ -132,12 +134,12 @@ def createNetwork(connection):
             spawnhabitatmodel = spawnhabitatmodel + ', habitat_spawn_' + feature[0]
             rearhabitatmodel = rearhabitatmodel + ', habitat_rear_' + feature[0]
             habitatmodel = habitatmodel + ', habitat_' + feature[0]
-    
+            barriermodel = barriermodel + ', barrier_up_' + feature[0] + '_cnt'
     
     query = f"""
         SELECT a.{appconfig.dbIdField} as id, 
-            st_length(a.{appconfig.dbGeomField}), a.{appconfig.dbGeomField},
-            barrier_up_cnt
+            st_length(a.{appconfig.dbGeomField}), a.{appconfig.dbGeomField}
+            {barriermodel}
             {accessibilitymodel} {spawnhabitatmodel} {rearhabitatmodel} {habitatmodel}
         FROM {dbTargetSchema}.{dbTargetStreamTable} a
     """
@@ -173,13 +175,13 @@ def createNetwork(connection):
                 nodes[endt] = toNode
             
             edge = Edge(fromNode, toNode, fid, length, geom)
-            edge.upbarriercnt = feature[3]
-            index = 4
+            index = 3
             for fish in species:
-                edge.speca[fish] = feature[index]
-                edge.spawn_habitat[fish] = feature[index + len(species)]
-                edge.rear_habitat[fish] = feature[index + len(species)]
-                edge.habitat[fish] = feature[index + len(species)]
+                edge.upbarriercnt[fish] = feature[index]
+                edge.speca[fish] = feature[index + len(species)]
+                edge.spawn_habitat[fish] = feature[index + (len(species)*2)]
+                edge.rear_habitat[fish] = feature[index + (len(species)*3)]
+                edge.habitat[fish] = feature[index + (len(species)*4)]
                 index = index + 1
 
             edge.spawn_habitat_all = edge.check_spawn_habitat_all()
@@ -189,7 +191,9 @@ def createNetwork(connection):
             edges.append(edge)
             
             fromNode.addOutEdge(edge)
-            toNode.addInEdge(edge)     
+            toNode.addInEdge(edge)
+
+            # edge.print()
 
 def processNodes():
     
@@ -221,6 +225,7 @@ def processNodes():
         spawn_funchabitat_all = 0
         rear_funchabitat_all = 0
         funchabitat_all = 0
+        outbarriercnt = {}
         
         for fish in species:
             uplength[fish] = 0
@@ -230,11 +235,12 @@ def processNodes():
             spawn_funchabitat[fish] = 0
             rear_funchabitat[fish] = 0
             funchabitat[fish] = 0
-        
-        outbarriercnt = 0
+            outbarriercnt[fish] = 0
         
         for inedge in node.inedges:
-            outbarriercnt += inedge.upbarriercnt
+
+            for fish in species:
+                outbarriercnt[fish] += inedge.upbarriercnt[fish]
                 
             if not inedge.visited:
                 allvisited = False
@@ -288,7 +294,7 @@ def processNodes():
                         outedge.habitatup[fish] = habitat[fish]
 
 
-                    if outedge.upbarriercnt != outbarriercnt:
+                    if outedge.upbarriercnt[fish] != outbarriercnt[fish]:
                         if outedge.spawn_habitat[fish]:
                             outedge.spawn_funchabitatup[fish] = outedge.length
                         else:
@@ -299,7 +305,7 @@ def processNodes():
                         outedge.spawn_funchabitatup[fish] = spawn_funchabitat[fish]
 
 
-                    if outedge.upbarriercnt != outbarriercnt:
+                    if outedge.upbarriercnt[fish] != outbarriercnt[fish]:
                         if outedge.rear_habitat[fish]:
                             outedge.rear_funchabitatup[fish] = outedge.length
                         else:
@@ -310,7 +316,7 @@ def processNodes():
                         outedge.rear_funchabitatup[fish] = rear_funchabitat[fish]
 
 
-                    if outedge.upbarriercnt != outbarriercnt:
+                    if outedge.upbarriercnt[fish] != outbarriercnt[fish]:
                         if outedge.habitat[fish]:
                             outedge.funchabitatup[fish] = outedge.length
                         else:
@@ -336,7 +342,6 @@ def processNodes():
                 else:
                     outedge.habitatup_all = habitat_all
                 
-
                 if outedge.upbarriercnt != outbarriercnt:
                     if outedge.spawn_habitat_all:
                         outedge.spawn_funchabitatup_all = outedge.length
@@ -585,27 +590,55 @@ def writeResults(connection):
 
 
 def assignBarrierCounts(connection):
-    
+
     query = f"""
-        UPDATE {dbTargetSchema}.{dbBarrierTable}
-        SET 
-            barrier_cnt_upstr = a.barrier_up_cnt,
-            barriers_upstr = a.barriers_up,
-            gradient_barrier_cnt_upstr = a.gradient_barrier_up_cnt
-        FROM {dbTargetSchema}.{dbTargetStreamTable} a
-        WHERE a.id =  {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
-        
-        UPDATE {dbTargetSchema}.{dbBarrierTable}
-        SET
-            barrier_cnt_downstr = a.barrier_down_cnt,
-            barriers_downstr = a.barriers_down,
-            gradient_barrier_cnt_downstr = a.gradient_barrier_down_cnt
-        FROM {dbTargetSchema}.{dbTargetStreamTable} a
-        WHERE a.id =  {dbTargetSchema}.{dbBarrierTable}.stream_id_down;
-        
+        SELECT a.code
+        FROM {appconfig.dataSchema}.{appconfig.fishSpeciesTable} a
     """
+
     with connection.cursor() as cursor:
-        cursor.execute(query)             
+        cursor.execute(query)
+        species = cursor.fetchall()
+
+    for code in species:
+        fish = code[0]
+
+        query = f"""
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS barrier_cnt_upstr_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS barriers_upstr_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS gradient_barrier_cnt_upstr_{fish};
+
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS barrier_cnt_downstr_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS barriers_downstr_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS gradient_barrier_cnt_downstr_{fish};
+
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN IF NOT EXISTS barrier_cnt_upstr_{fish} integer;
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN IF NOT EXISTS barriers_upstr_{fish} varchar[];
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN IF NOT EXISTS gradient_barrier_cnt_upstr_{fish} integer;
+
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN IF NOT EXISTS barrier_cnt_downstr_{fish} integer;
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN IF NOT EXISTS barriers_downstr_{fish} varchar[];
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN IF NOT EXISTS gradient_barrier_cnt_downstr_{fish} integer;
+
+            UPDATE {dbTargetSchema}.{dbBarrierTable}
+            SET 
+                barrier_cnt_upstr_{fish} = a.barrier_up_{fish}_cnt,
+                barriers_upstr_{fish} = a.barriers_up_{fish},
+                gradient_barrier_cnt_upstr_{fish} = a.gradient_barrier_up_{fish}_cnt
+            FROM {dbTargetSchema}.{dbTargetStreamTable} a
+            WHERE a.id =  {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
+            
+            UPDATE {dbTargetSchema}.{dbBarrierTable}
+            SET
+                barrier_cnt_downstr_{fish} = a.barrier_down_{fish}_cnt,
+                barriers_downstr_{fish} = a.barriers_down_{fish},
+                gradient_barrier_cnt_downstr_{fish} = a.gradient_barrier_down_{fish}_cnt
+            FROM {dbTargetSchema}.{dbTargetStreamTable} a
+            WHERE a.id =  {dbTargetSchema}.{dbBarrierTable}.stream_id_down;
+            
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query)             
 
     connection.commit()
     

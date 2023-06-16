@@ -90,10 +90,6 @@ def computeHabitatModel(connection):
                     
                     UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
                         SET {colname} = false;
-
-                    UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-                        SET {colname} = true
-                        WHERE strahler_order >= 2;
                     
                 """
                 with connection.cursor() as cursor2:
