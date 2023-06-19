@@ -262,7 +262,7 @@ def computeAttributes(connection):
             
         query = f"""
             UPDATE {dbTargetSchema}.{dbModelledCrossingsTable}
-            SET {colname} = 1 WHERE {colname} IS NULL;
+            SET {colname} = 0 WHERE {colname} IS NULL;
         """
 
         with connection.cursor() as cursor:

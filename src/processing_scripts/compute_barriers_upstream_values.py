@@ -86,10 +86,13 @@ class Edge:
 
         # self.upbarriercnt = 0
         self.upbarriercnt = {}
+        self.uppassability = {}
+        self.dci = {}
     
     def print(self):
         print("fid:", self.fid)
         print("upbarriercnt:", self.upbarriercnt)
+        print("uppassability:", self.uppassability)
         print("species accessibility:", self.speca)
         print("spawn_habitat:", self.spawn_habitat)
         print("rear_habitat:", self.rear_habitat)
@@ -120,29 +123,36 @@ def createNetwork(connection):
         FROM {appconfig.dataSchema}.{appconfig.fishSpeciesTable} a
     """
     
+    barriermodel = ''
+    passabilitymodel = ''
     accessibilitymodel = ''
     spawnhabitatmodel = ''
     rearhabitatmodel = ''
     habitatmodel = ''
-    barriermodel = ''
     with connection.cursor() as cursor:
         cursor.execute(query)
         features = cursor.fetchall()
         for feature in features:
             species.append(feature[0])
+            barriermodel = barriermodel + ', barrier_up_' + feature[0] + '_cnt'
+            passabilitymodel = passabilitymodel + ', b.passability_status_' + feature[0]
             accessibilitymodel = accessibilitymodel + ', ' + feature[0] + '_accessibility'
             spawnhabitatmodel = spawnhabitatmodel + ', habitat_spawn_' + feature[0]
             rearhabitatmodel = rearhabitatmodel + ', habitat_rear_' + feature[0]
             habitatmodel = habitatmodel + ', habitat_' + feature[0]
-            barriermodel = barriermodel + ', barrier_up_' + feature[0] + '_cnt'
+
     
     query = f"""
         SELECT a.{appconfig.dbIdField} as id, 
             st_length(a.{appconfig.dbGeomField}), a.{appconfig.dbGeomField}
-            {barriermodel}
+            {barriermodel} {passabilitymodel}
             {accessibilitymodel} {spawnhabitatmodel} {rearhabitatmodel} {habitatmodel}
         FROM {dbTargetSchema}.{dbTargetStreamTable} a
+        LEFT JOIN {dbTargetSchema}.{dbBarrierTable} b
+        ON a.id = b.stream_id_up;
     """
+
+    # print(query)
    
     #load geometries and create a network
     with connection.cursor() as cursor:
@@ -178,10 +188,11 @@ def createNetwork(connection):
             index = 3
             for fish in species:
                 edge.upbarriercnt[fish] = feature[index]
-                edge.speca[fish] = feature[index + len(species)]
-                edge.spawn_habitat[fish] = feature[index + (len(species)*2)]
-                edge.rear_habitat[fish] = feature[index + (len(species)*3)]
-                edge.habitat[fish] = feature[index + (len(species)*4)]
+                edge.uppassability[fish] = int(1 if feature[index + len(species)] is None else feature[index + len(species)])
+                edge.speca[fish] = feature[index + len(species)*2]
+                edge.spawn_habitat[fish] = feature[index + (len(species)*3)]
+                edge.rear_habitat[fish] = feature[index + (len(species)*4)]
+                edge.habitat[fish] = feature[index + (len(species)*5)]
                 index = index + 1
 
             edge.spawn_habitat_all = edge.check_spawn_habitat_all()
@@ -195,11 +206,25 @@ def createNetwork(connection):
 
             # edge.print()
 
-def processNodes():
+def processNodes(connection):
     
     
     #walk down network        
     toprocess = deque()
+
+    # total_length = {}
+
+    # with connection.cursor() as cursor:
+    #     for fish in species:
+    #         query = f"""
+    #             SELECT sum(segment_length) * 1000 --get value in meters
+    #             FROM {dbTargetSchema}.{dbTargetStreamTable}
+    #             WHERE habitat_{fish} is true;
+    #         """
+    #         cursor.execute(query)
+    #         lengths = cursor.fetchall()
+    #         total_length[fish] = lengths[0][0]
+
     for edge in edges:
         edge.visited = False
         
@@ -226,6 +251,8 @@ def processNodes():
         rear_funchabitat_all = 0
         funchabitat_all = 0
         outbarriercnt = {}
+        dci = {}
+        total_length = {}
         
         for fish in species:
             uplength[fish] = 0
@@ -236,11 +263,18 @@ def processNodes():
             rear_funchabitat[fish] = 0
             funchabitat[fish] = 0
             outbarriercnt[fish] = 0
+            dci[fish] = 0
+            total_length[fish] = sum(edge.length for edge in edges if edge.habitat[fish])
         
         for inedge in node.inedges:
 
             for fish in species:
                 outbarriercnt[fish] += inedge.upbarriercnt[fish]
+
+                if inedge.habitat[fish]:
+                    inedge.dci[fish] = ((inedge.length / total_length[fish]) * inedge.uppassability[fish]) * 100
+                else:
+                    inedge.dci[fish] = 0
                 
             if not inedge.visited:
                 allvisited = False
@@ -270,6 +304,11 @@ def processNodes():
             for outedge in node.outedges:
 
                 for fish in species:
+
+                    if outedge.habitat[fish]:
+                        outedge.dci[fish] = ((outedge.length / total_length[fish]) * outedge.uppassability[fish]) * 100
+                    else:
+                        outedge.dci[fish] = 0
 
                     if (outedge.speca[fish] == appconfig.Accessibility.ACCESSIBLE.value or outedge.speca[fish] == appconfig.Accessibility.POTENTIAL.value):
                         outedge.specaup[fish] = uplength[fish] + outedge.length
@@ -391,7 +430,8 @@ def writeResults(connection):
         tablestr = tablestr + ', func_upstr_hab_spawn_' + fish + ' double precision'
         tablestr = tablestr + ', func_upstr_hab_rear_' + fish + ' double precision'
         tablestr = tablestr + ', func_upstr_hab_' + fish + ' double precision'
-        inserttablestr = inserttablestr + ",%s,%s,%s,%s,%s,%s,%s"
+        tablestr = tablestr + ', dci_' + fish + ' double precision'
+        inserttablestr = inserttablestr + ",%s,%s,%s,%s,%s,%s,%s,%s"
 
     tablestr = tablestr + ', total_upstr_hab_spawn_all' + ' double precision'
     tablestr = tablestr + ', total_upstr_hab_rear_all' + ' double precision'
@@ -431,6 +471,7 @@ def writeResults(connection):
             data.append (edge.spawn_funchabitatup[fish])
             data.append (edge.rear_funchabitatup[fish])
             data.append (edge.funchabitatup[fish])
+            data.append (edge.dci[fish])
         
         data.append(edge.spawn_habitatup_all)
         data.append(edge.rear_habitatup_all)
@@ -515,6 +556,23 @@ def writeResults(connection):
             WHERE a.stream_id = b.id AND 
                 a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up;
 
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS dci_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN dci_{fish} double precision;
+            
+            UPDATE {dbTargetSchema}.{dbTargetStreamTable}
+            SET dci_{fish} = a.dci_{fish}
+            FROM {dbTargetSchema}.temp a
+            WHERE a.stream_id = id;
+
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS dci_{fish};
+            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN dci_{fish} double precision;
+            
+            UPDATE {dbTargetSchema}.{dbBarrierTable} 
+            SET dci_{fish} = a.dci_{fish}
+            FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
+            WHERE a.stream_id = b.id AND 
+                a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up; 
+
         """
         with connection.cursor() as cursor:
             cursor.execute(query)
@@ -580,11 +638,11 @@ def writeResults(connection):
     with connection.cursor() as cursor:
         cursor.execute(query)
 
-    query = f"""
-        DROP TABLE {dbTargetSchema}.temp;
-    """
-    with connection.cursor() as cursor:
-        cursor.execute(query)        
+    # query = f"""
+    #     DROP TABLE {dbTargetSchema}.temp;
+    # """
+    # with connection.cursor() as cursor:
+    #     cursor.execute(query)        
 
     connection.commit()
 
@@ -663,7 +721,7 @@ def main():
         createNetwork(conn)
         
         print("  processing nodes")
-        processNodes()
+        processNodes(conn)
             
         print("  writing results")
         writeResults(conn)
