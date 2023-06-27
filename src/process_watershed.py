@@ -26,6 +26,7 @@ from processing_scripts import load_parameters
 from processing_scripts import preprocess_watershed
 from processing_scripts import load_and_snap_barriers_cabd
 from processing_scripts import load_and_snap_fishobservation
+from processing_scripts import load_habitat_access_updates
 from processing_scripts import compute_modelled_crossings
 from processing_scripts import load_barrier_updates
 from processing_scripts import compute_mainstems
@@ -62,6 +63,7 @@ assign_raw_z.main()
 smooth_z.main()
 compute_segment_gradient.main()
 compute_updown_barriers_fish.main()
+load_habitat_access_updates.main()
 compute_accessibility.main()
 assign_habitat.main()
 compute_barriers_upstream_values.main()
