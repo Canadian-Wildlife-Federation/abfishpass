@@ -97,6 +97,7 @@ def main():
             fishrearhabitat_query = ''
             fishhabitat_query = ''
             connectivity_status_query = ''
+            dci_query = ''
             allfishspawn_query = ''
             allfishrear_query = ''
             allfishhabitat_query = ''
@@ -126,7 +127,8 @@ def main():
                     ADD COLUMN IF NOT EXISTS {fish}_total_spawn_km double precision,
                     ADD COLUMN IF NOT EXISTS {fish}_total_rear_km double precision,
                     ADD COLUMN IF NOT EXISTS {fish}_total_habitat_km double precision,
-                    ADD COLUMN IF NOT EXISTS {fish}_connectivity_status double precision;
+                    ADD COLUMN IF NOT EXISTS {fish}_connectivity_status double precision,
+                    ADD COLUMN IF NOT EXISTS {fish}_dci double precision;
                 """
                 
                 fishaccess_query = f"""
@@ -211,7 +213,7 @@ def main():
                 allfishpotentialaccesshabitat = allfishpotentialaccesshabitat + f"""({fish}_accessibility = '{appconfig.Accessibility.POTENTIAL.value}' AND habitat_{fish} = true)"""
 
                 fishspawnhabitat_query = f"""
-                    {fishspawnhabitat_query}                
+                    {fishspawnhabitat_query}
                     WITH alldata AS ({alldataquery})
                     UPDATE {appconfig.dataSchema}.{statTable} SET {fish}_total_spawn_km =
                     (SELECT sum(segment_length) FROM alldata
@@ -220,7 +222,7 @@ def main():
                 """
 
                 fishrearhabitat_query = f"""
-                    {fishrearhabitat_query}                
+                    {fishrearhabitat_query}
                     WITH alldata AS ({alldataquery})
                     UPDATE {appconfig.dataSchema}.{statTable} SET {fish}_total_rear_km =
                     (SELECT sum(segment_length) FROM alldata
@@ -229,7 +231,7 @@ def main():
                 """
 
                 fishhabitat_query = f"""
-                    {fishhabitat_query}                
+                    {fishhabitat_query}
                     WITH alldata AS ({alldataquery})
                     UPDATE {appconfig.dataSchema}.{statTable} SET {fish}_total_habitat_km =
                     (SELECT sum(segment_length) FROM alldata
@@ -238,12 +240,20 @@ def main():
                 """
 
                 connectivity_status_query = f"""
-                    {connectivity_status_query}   
+                    {connectivity_status_query}
                     UPDATE {appconfig.dataSchema}.{statTable} SET {fish}_connectivity_status =
-                    (SELECT ({fish}_accessible_habitat_km / ({fish}_accessible_habitat_km + {fish}_potentially_accessible_habitat_km))
+                    (SELECT ({fish}_accessible_habitat_km / ({fish}_accessible_habitat_km + {fish}_potentially_accessible_habitat_km))*100
                     FROM {appconfig.dataSchema}.{statTable}
                     WHERE watershed_id = '{watershed_id}')
                     WHERE watershed_id = '{watershed_id}';
+                """
+
+                dci_query = f"""
+                    {dci_query}
+                    UPDATE {appconfig.dataSchema}.{statTable} SET {fish}_dci =
+                    (SELECT sum(dci_{fish})
+                    FROM ({alldataquery}) as alldata
+                    WHERE watershed_id = '{watershed_id}');
                 """
 
                 if (allfishspawn is None):
@@ -360,6 +370,7 @@ def main():
                 {allfishhabitat_query}
                 {allfishpotentialaccesshabitat_query}
                 {connectivity_status_query}
+                {dci_query}
             """
             
             # print(query)
