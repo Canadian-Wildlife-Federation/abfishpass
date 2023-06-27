@@ -25,6 +25,7 @@ import appconfig
 import shapely.wkb
 from collections import deque
 import psycopg2.extras
+import numpy as np
 
 iniSection = appconfig.args.args[0]
 dbTargetSchema = appconfig.config[iniSection]['output_schema']
@@ -84,15 +85,16 @@ class Edge:
         self.rear_funchabitatup_all = {}
         self.funchabitatup_all = {}
 
-        # self.upbarriercnt = 0
         self.upbarriercnt = {}
-        self.uppassability = {}
+        self.downbarriers = {}
+        self.downpassability = {}
         self.dci = {}
     
     def print(self):
         print("fid:", self.fid)
         print("upbarriercnt:", self.upbarriercnt)
-        print("uppassability:", self.uppassability)
+        print("downbarriers:", self.downbarriers)
+        print("downpassability:", self.downpassability)
         print("species accessibility:", self.speca)
         print("spawn_habitat:", self.spawn_habitat)
         print("rear_habitat:", self.rear_habitat)
@@ -116,6 +118,9 @@ class Edge:
         result = any(val == True for val in self.habitat.values())
         return result
 
+    def __iter__(self):
+        return iter([self.fid, self.length, self.downbarriers, self.downpassability, self.habitat])
+
 def createNetwork(connection):
     
     query = f"""
@@ -123,8 +128,8 @@ def createNetwork(connection):
         FROM {appconfig.dataSchema}.{appconfig.fishSpeciesTable} a
     """
     
-    barriermodel = ''
-    passabilitymodel = ''
+    barrierupcntmodel = ''
+    barrierdownmodel = ''
     accessibilitymodel = ''
     spawnhabitatmodel = ''
     rearhabitatmodel = ''
@@ -134,8 +139,8 @@ def createNetwork(connection):
         features = cursor.fetchall()
         for feature in features:
             species.append(feature[0])
-            barriermodel = barriermodel + ', barrier_up_' + feature[0] + '_cnt'
-            passabilitymodel = passabilitymodel + ', b.passability_status_' + feature[0]
+            barrierupcntmodel = barrierupcntmodel + ', barrier_up_' + feature[0] + '_cnt'
+            barrierdownmodel = barrierdownmodel + ', barriers_down_' + feature[0]
             accessibilitymodel = accessibilitymodel + ', ' + feature[0] + '_accessibility'
             spawnhabitatmodel = spawnhabitatmodel + ', habitat_spawn_' + feature[0]
             rearhabitatmodel = rearhabitatmodel + ', habitat_rear_' + feature[0]
@@ -145,14 +150,12 @@ def createNetwork(connection):
     query = f"""
         SELECT a.{appconfig.dbIdField} as id, 
             st_length(a.{appconfig.dbGeomField}), a.{appconfig.dbGeomField}
-            {barriermodel} {passabilitymodel}
+            {barrierupcntmodel} {barrierdownmodel}
             {accessibilitymodel} {spawnhabitatmodel} {rearhabitatmodel} {habitatmodel}
         FROM {dbTargetSchema}.{dbTargetStreamTable} a
         LEFT JOIN {dbTargetSchema}.{dbBarrierTable} b
         ON a.id = b.stream_id_up;
     """
-
-    # print(query)
    
     #load geometries and create a network
     with connection.cursor() as cursor:
@@ -183,12 +186,27 @@ def createNetwork(connection):
                 #create new node
                 toNode = Node(endc[0], endc[1])
                 nodes[endt] = toNode
-            
+
             edge = Edge(fromNode, toNode, fid, length, geom)
             index = 3
             for fish in species:
                 edge.upbarriercnt[fish] = feature[index]
-                edge.uppassability[fish] = int(1 if feature[index + len(species)] is None else feature[index + len(species)])
+                edge.downbarriers[fish] = feature[index + len(species)]
+
+                passabilities = []
+
+                for barrier in edge.downbarriers[fish]:
+                    query = f"""
+                    SELECT passability_status_{fish} FROM {dbTargetSchema}.{dbBarrierTable} WHERE id = '{barrier}';
+                    """
+                    with connection.cursor() as cursor2:
+                        cursor2.execute(query)
+                        status = cursor2.fetchone()
+                        val = float(0 if status[0] is None else status[0])
+                        passabilities.append(val)
+                
+                edge.downpassability[fish] = np.prod(passabilities)
+
                 edge.speca[fish] = feature[index + len(species)*2]
                 edge.spawn_habitat[fish] = feature[index + (len(species)*3)]
                 edge.rear_habitat[fish] = feature[index + (len(species)*4)]
@@ -204,26 +222,12 @@ def createNetwork(connection):
             fromNode.addOutEdge(edge)
             toNode.addInEdge(edge)
 
-            # edge.print()
 
 def processNodes(connection):
     
     
     #walk down network        
     toprocess = deque()
-
-    # total_length = {}
-
-    # with connection.cursor() as cursor:
-    #     for fish in species:
-    #         query = f"""
-    #             SELECT sum(segment_length) * 1000 --get value in meters
-    #             FROM {dbTargetSchema}.{dbTargetStreamTable}
-    #             WHERE habitat_{fish} is true;
-    #         """
-    #         cursor.execute(query)
-    #         lengths = cursor.fetchall()
-    #         total_length[fish] = lengths[0][0]
 
     for edge in edges:
         edge.visited = False
@@ -265,14 +269,14 @@ def processNodes(connection):
             outbarriercnt[fish] = 0
             dci[fish] = 0
             total_length[fish] = sum(edge.length for edge in edges if edge.habitat[fish])
-        
+
         for inedge in node.inedges:
 
             for fish in species:
                 outbarriercnt[fish] += inedge.upbarriercnt[fish]
 
                 if inedge.habitat[fish]:
-                    inedge.dci[fish] = ((inedge.length / total_length[fish]) * inedge.uppassability[fish]) * 100
+                    inedge.dci[fish] = ((inedge.length / total_length[fish]) * inedge.downpassability[fish]) * 100
                 else:
                     inedge.dci[fish] = 0
                 
@@ -306,9 +310,10 @@ def processNodes(connection):
                 for fish in species:
 
                     if outedge.habitat[fish]:
-                        outedge.dci[fish] = ((outedge.length / total_length[fish]) * outedge.uppassability[fish]) * 100
+                        outedge.dci[fish] = ((outedge.length / total_length[fish]) * outedge.downpassability[fish]) * 100
                     else:
                         outedge.dci[fish] = 0
+
 
                     if (outedge.speca[fish] == appconfig.Accessibility.ACCESSIBLE.value or outedge.speca[fish] == appconfig.Accessibility.POTENTIAL.value):
                         outedge.specaup[fish] = uplength[fish] + outedge.length
@@ -564,15 +569,6 @@ def writeResults(connection):
             FROM {dbTargetSchema}.temp a
             WHERE a.stream_id = id;
 
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} DROP COLUMN IF EXISTS dci_{fish};
-            ALTER TABLE {dbTargetSchema}.{dbBarrierTable} ADD COLUMN dci_{fish} double precision;
-            
-            UPDATE {dbTargetSchema}.{dbBarrierTable} 
-            SET dci_{fish} = a.dci_{fish}
-            FROM {dbTargetSchema}.temp a,{dbTargetSchema}.{dbTargetStreamTable} b 
-            WHERE a.stream_id = b.id AND 
-                a.stream_id = {dbTargetSchema}.{dbBarrierTable}.stream_id_up; 
-
         """
         with connection.cursor() as cursor:
             cursor.execute(query)
@@ -638,11 +634,11 @@ def writeResults(connection):
     with connection.cursor() as cursor:
         cursor.execute(query)
 
-    # query = f"""
-    #     DROP TABLE {dbTargetSchema}.temp;
-    # """
-    # with connection.cursor() as cursor:
-    #     cursor.execute(query)        
+    query = f"""
+        DROP TABLE {dbTargetSchema}.temp;
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query)        
 
     connection.commit()
 
