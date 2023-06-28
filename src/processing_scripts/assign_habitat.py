@@ -165,6 +165,10 @@ def computeHabitatModel(connection):
                     SET {colname} = false
                     FROM {updateTable} b
                     WHERE b.stream_id = a.id AND b.habitat_rear_{code} = 'false' AND b.update_type = 'habitat';
+
+                    UPDATE {dbTargetSchema}.{dbTargetStreamTable}
+                    SET {colname} = false
+                    WHERE {code}_accessibility = '{appconfig.Accessibility.NOT.value}';
                     
                 """
                 with connection.cursor() as cursor2:

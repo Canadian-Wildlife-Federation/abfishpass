@@ -21,6 +21,9 @@
 #
  
 import appconfig
+from datetime import datetime
+
+startTime = datetime.now()
 
 from processing_scripts import load_parameters
 from processing_scripts import preprocess_watershed
@@ -69,3 +72,4 @@ assign_habitat.main()
 compute_barriers_upstream_values.main()
 
 print ("Processing Complete: " + workingWatershedId)
+print("Runtime: " + str((datetime.now() - startTime)))
