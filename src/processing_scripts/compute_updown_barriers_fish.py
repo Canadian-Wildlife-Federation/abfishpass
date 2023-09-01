@@ -17,9 +17,7 @@
 #----------------------------------------------------------------------------------
 
 #
-# this script computes upstream/downstream barrier counts, ids, and fish species for 
-# fish survey and stocking information
-#
+# this script computes upstream/downstream barrier counts and ids
 #
 import appconfig
 import shapely.wkb
@@ -30,17 +28,27 @@ import psycopg2.extras
 iniSection = appconfig.args.args[0]
 
 dbTargetSchema = appconfig.config[iniSection]['output_schema']
+dataSchema = appconfig.config['DATABASE']['data_schema']
 watershed_id = appconfig.config[iniSection]['watershed_id']
 dbTargetStreamTable = appconfig.config['PROCESSING']['stream_table']
 
 dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 dbGradientBarrierTable = appconfig.config['BARRIER_PROCESSING']['gradient_barrier_table']
-
-dbFishStockingTable = appconfig.config['DATABASE']['fish_stocking_table']
-dbFishSurveyTable = appconfig.config['DATABASE']['fish_survey_table']
+snapDistance = appconfig.config['CABD_DATABASE']['snap_distance']
 
 edges = []
 nodes = dict()
+
+with appconfig.connectdb() as conn:
+
+    query = f"""
+    SELECT code, name
+    FROM {dataSchema}.{appconfig.fishSpeciesTable};
+    """
+
+    with conn.cursor() as cursor:
+        cursor.execute(query)
+        specCodes = cursor.fetchall()
 
 class Node:
     
@@ -71,14 +79,8 @@ class Edge:
         self.downbarriers = set()
         self.upgradient = set()
         self.downgradient = set()
-        self.stockedge = set()
-        self.stockup = set()
-        self.stockdown = set()
-        self.surveyedge = set()
-        self.surveyup = set()
-        self.surveydown = set()
         
-def createNetwork(connection):
+def createNetwork(connection, code):
     
     query = f"""
         SELECT a.{appconfig.dbIdField} as id, a.{appconfig.dbGeomField}
@@ -123,17 +125,17 @@ def createNetwork(connection):
             
     #add barriers
     query = f"""
-        select 'up', a.id, b.id 
+        select 'up', a.id, b.id
         from {dbTargetSchema}.{dbBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
-        where b.geometry && st_buffer(a.snapped_point, 0.0000001)
-            and st_distance(st_startpoint(b.geometry), a.snapped_point) < 0.00000001
-            and a.passability_status != 'PASSABLE'
+        where b.geometry && st_buffer(a.snapped_point, 0.01)
+            and st_distance(st_startpoint(b.geometry), a.snapped_point) < 0.01
+            and a.passability_status_{code} != 1
         union 
         select 'down', a.id, b.id 
         from {dbTargetSchema}.{dbBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
-        where b.geometry && st_buffer(a.snapped_point, 0.0000001)
-            and st_distance(st_endpoint(b.geometry), a.snapped_point) < 0.00000001 
-            and a.passability_status != 'PASSABLE'       
+        where b.geometry && st_buffer(a.snapped_point, 0.01)
+            and st_distance(st_endpoint(b.geometry), a.snapped_point) < 0.01
+            and a.passability_status_{code} != 1     
     """
    
     #load geometries and create a network
@@ -156,17 +158,19 @@ def createNetwork(connection):
                         
     #add gradient barriers
     query = f"""
-        select 'up', a.barrier_id, b.id 
+        select 'up', a.id, b.id 
         from {dbTargetSchema}.{dbGradientBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
-        where b.geometry && st_buffer(a.point, 0.0000001)
-            and st_distance(st_startpoint(b.geometry), a.point) < 0.00000001
+        where b.geometry && st_buffer(a.point, 0.01)
+            and st_distance(st_startpoint(b.geometry), a.point) < 0.01
             and a.type = 'gradient_barrier'
+            and a.passability_status_{code} != 1 
         union 
-        select 'down', a.barrier_id, b.id 
+        select 'down', a.id, b.id 
         from {dbTargetSchema}.{dbGradientBarrierTable} a, {dbTargetSchema}.{dbTargetStreamTable} b
-        where b.geometry && st_buffer(a.point, 0.0000001)
-            and st_distance(st_endpoint(b.geometry), a.point) < 0.00000001 
-            and a.type = 'gradient_barrier'     
+        where b.geometry && st_buffer(a.point, 0.01)
+            and st_distance(st_endpoint(b.geometry), a.point) < 0.01
+            and a.type = 'gradient_barrier'
+            and a.passability_status_{code} != 1
     """
    
     #load geometries and create a network
@@ -187,47 +191,6 @@ def createNetwork(connection):
                     elif (etype == 'down'):
                         edge.toNode.gradientbarrierids.add(bid)         
 
-    #add species and stocking details
-    query = f"""
-        select a.stream_id, a.spec_code
-        FROM {dbTargetSchema}.{dbFishStockingTable} a
-        WHERE spec_code IS NOT NULL
-    """ 
-    
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-        features = cursor.fetchall()
-        
-        
-        for feature in features:
-            sid = feature[0]
-            speccode = feature[1]
-            
-            for edge in edges:
-                if (edge.fid == sid):
-                    edge.stockedge.add(speccode)
-    
-    query = f"""
-        select a.stream_id, a.spec_code
-        FROM {dbTargetSchema}.{dbFishSurveyTable} a
-        WHERE spec_code IS NOT NULL
-    """
-   
-    #add species and stocking details
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-        features = cursor.fetchall()
-        
-        
-        for feature in features:
-            sid = feature[0]
-            speccode = feature[1]
-            
-            for edge in edges:
-                if (edge.fid == sid):
-                    edge.surveyedge.add(speccode)
-                                            
-
 def processNodes():
     
     
@@ -247,22 +210,15 @@ def processNodes():
         
         upbarriers = set()
         upgradient = set()
-        
-        stockup = set()
-        surveyup = set()
          
         for inedge in node.inedges:
                
             if not inedge.visited:
-                allvisited = False;
-                break;
+                allvisited = False
+                break
             else:
                 upbarriers.update(inedge.upbarriers)
                 upgradient.update(inedge.upgradient)
-                stockup.update(inedge.stockup)
-                stockup.update(inedge.stockedge)
-                surveyup.update(inedge.surveyup)
-                surveyup.update(inedge.surveyedge)
                 
         if not allvisited:
             toprocess.append(node)
@@ -273,8 +229,6 @@ def processNodes():
             for outedge in node.outedges:
                 outedge.upbarriers.update(upbarriers)
                 outedge.upgradient.update(upgradient)
-                outedge.stockup.update(stockup)
-                outedge.surveyup.update(surveyup)
                 
                 outedge.visited = True
                 if (not outedge.toNode in toprocess):
@@ -302,50 +256,37 @@ def processNodes():
         downgradient = set()
         downgradient.update(node.gradientbarrierids)
         
-        stockdown = set()
-        surveydown = set()
-        
         allvisited = True
         
         for outedge in node.outedges:
-            if not inedge.visited:
-                allvisited = False;
-                break;
+            if not outedge.visited:
+                allvisited = False
+                break
             else:
                 downbarriers.update(outedge.downbarriers)
                 downgradient.update(outedge.downgradient)
-                stockdown.update(outedge.stockdown)
-                stockdown.update(outedge.stockedge)
-                surveydown.update(outedge.surveydown)
-                surveydown.update(outedge.surveyedge)
-        
+
         if not allvisited:
             toprocess.append(node)
         else:
             for inedge in node.inedges:
                 inedge.downbarriers.update(downbarriers)
-                inedge.downgradient.update(downgradient)
-                inedge.stockdown.update(stockdown)                
-                inedge.surveydown.update(surveydown)
+                inedge.downgradient.update(downgradient)             
                 inedge.visited = True
-                if (not outedge.toNode in toprocess):
+                if (not inedge.toNode in toprocess):
                     toprocess.append(inedge.fromNode)
     
         
-def writeResults(connection):
+def writeResults(connection, code):
       
     updatequery = f"""
         UPDATE {dbTargetSchema}.{dbTargetStreamTable} SET 
-            barrier_up_cnt = %s,
-            barrier_down_cnt = %s,
-            barriers_up = %s,
-            barriers_down = %s,
-            gradient_barrier_up_cnt = %s,
-            gradient_barrier_down_cnt = %s,
-            fish_stock_up = %s,
-            fish_stock_down = %s,
-            fish_survey_up = %s,
-            fish_survey_down = %s
+            barrier_up_{code}_cnt = %s,
+            barrier_down_{code}_cnt = %s,
+            barriers_up_{code} = %s,
+            barriers_down_{code} = %s,
+            gradient_barrier_up_{code}_cnt = %s,
+            gradient_barrier_down_{code}_cnt = %s
             
         WHERE id = %s;
     """
@@ -355,16 +296,12 @@ def writeResults(connection):
     for edge in edges:
         upbarriersstr = (list(edge.upbarriers),)  
         downbarriersstr = (list(edge.downbarriers),)
-        upstockstr = (list(edge.stockup),)  
-        downstockstr = (list(edge.stockdown),) 
-        upsurveystr = (list(edge.surveyup),)  
-        downsurveystr = (list(edge.surveydown),) 
         
-        newdata.append( (len(edge.upbarriers), len(edge.downbarriers), upbarriersstr, downbarriersstr, len(edge.upgradient), len(edge.downgradient), upstockstr, downstockstr, upsurveystr, downsurveystr, edge.fid))
+        newdata.append( (len(edge.upbarriers), len(edge.downbarriers), upbarriersstr, downbarriersstr, len(edge.upgradient), len(edge.downgradient), edge.fid))
 
     
     with connection.cursor() as cursor:    
-        psycopg2.extras.execute_batch(cursor, updatequery, newdata);
+        psycopg2.extras.execute_batch(cursor, updatequery, newdata)
             
     connection.commit()
 
@@ -372,110 +309,51 @@ def writeResults(connection):
 #--- main program ---
 def main():
     
-    edges.clear()
-    nodes.clear()
-        
     with appconfig.connectdb() as conn:
-        
-        conn.autocommit = False
-        
-        print("Computing Upstream/Downstream Barriers")
-        print("  creating output column")
-        #add a new geometry column for output removing existing one
-        query = f"""
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barrier_up_cnt;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barrier_down_cnt;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barriers_up;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barriers_down;
 
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS gradient_barrier_up_cnt;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS gradient_barrier_down_cnt;
-            
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS fish_stock_up;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS fish_stock_down;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS fish_survey_up;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS fish_survey_down;
-            
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barrier_up_cnt int;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barrier_down_cnt int;
-            
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_up varchar[];
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_down varchar[];
-
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN gradient_barrier_up_cnt int;
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN gradient_barrier_down_cnt int;
-            
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_stock varchar[];
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_stock_up varchar[];
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_stock_down varchar[];
-            
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_survey varchar[];
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_survey_up varchar[];
-            ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN fish_survey_down varchar[];
-            
-
-            --re-match stream ids in case streams have been regenerated or rebroken
-            with match as (
-                SELECT a.id as stream_id, b.id as pntid, st_linelocatepoint(a.geometry, b.snapped_point) as streammeasure
-                FROM {dbTargetSchema}.{dbTargetStreamTable} a, {dbTargetSchema}.{dbFishStockingTable} b
-                WHERE st_intersects(a.geometry, st_buffer(b.snapped_point, 0.0001))
-            )
-            UPDATE {dbTargetSchema}.{dbFishStockingTable}
-            SET stream_id = a.stream_id, stream_measure = a.streammeasure
-            FROM match a WHERE a.pntid = {dbTargetSchema}.{dbFishStockingTable}.id;
-
-            with match as (
-                SELECT a.id as stream_id, b.id as pntid, st_linelocatepoint(a.geometry, b.snapped_point) as streammeasure
-                FROM {dbTargetSchema}.{dbTargetStreamTable} a, {dbTargetSchema}.{dbFishSurveyTable} b
-                WHERE st_intersects(a.geometry, st_buffer(b.snapped_point, 0.0001))
-            )
-            UPDATE {dbTargetSchema}.{dbFishSurveyTable}
-            SET stream_id = a.stream_id, stream_measure = a.streammeasure
-            FROM match a WHERE a.pntid = {dbTargetSchema}.{dbFishSurveyTable}.id;
-
-            
-            WITH fishcodes AS (
-                SELECT stream_id, array_agg(spec_code) as spec
-                FROM 
-                (
-                    SELECT distinct stream_id, spec_code
-                    FROM {dbTargetSchema}.{dbFishStockingTable}
-                    WHERE spec_code is not null
-                ) foo
-                GROUP BY stream_id
-            )
-            UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-            SET fish_stock = fishcodes.spec
-            FROM fishcodes 
-            WHERE fishcodes.stream_id = {dbTargetSchema}.{dbTargetStreamTable}.id   ;
-            
-            WITH fishcodes AS (
-                SELECT stream_id, array_agg(spec_code) as spec
-                FROM 
-                (
-                    SELECT distinct stream_id, spec_code
-                    FROM {dbTargetSchema}.{dbFishSurveyTable}
-                    WHERE spec_code is not null
-                ) foo
-                GROUP BY stream_id
-            )
-            UPDATE {dbTargetSchema}.{dbTargetStreamTable} 
-            SET fish_survey = fishcodes.spec
-            FROM fishcodes 
-            WHERE fishcodes.stream_id = {dbTargetSchema}.{dbTargetStreamTable}.id;
-        """
+        for species in specCodes:
+            code = species[0]
+            name = species[1]
         
-        with conn.cursor() as cursor:
-            cursor.execute(query)
-        
-        print("  creating network")
-        createNetwork(conn)
-        
-        print("  processing nodes")
-        processNodes()
+            conn.autocommit = False
+
+            edges.clear()
+            nodes.clear()
             
-        print("  writing results")
-        writeResults(conn)
+            print("Computing Upstream/Downstream Barriers")
+            print("  processing barriers for", name)
+            print("  creating output column")
+
+            query = f"""
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barrier_up_{code}_cnt;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barrier_down_{code}_cnt;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barriers_up_{code};
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS barriers_down_{code};
+
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS gradient_barrier_up_{code}_cnt;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} DROP COLUMN IF EXISTS gradient_barrier_down_{code}_cnt;
+                
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barrier_up_{code}_cnt int;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barrier_down_{code}_cnt int;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_up_{code} varchar[];
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN barriers_down_{code} varchar[];
+
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN gradient_barrier_up_{code}_cnt int;
+                ALTER TABLE {dbTargetSchema}.{dbTargetStreamTable} ADD COLUMN gradient_barrier_down_{code}_cnt int;
+                
+            """
+            
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+            
+            print("  creating network")
+            createNetwork(conn, code)
+            
+            print("  processing nodes")
+            processNodes()
+                
+            print("  writing results")
+            writeResults(conn, code)
         
     print("done")
     

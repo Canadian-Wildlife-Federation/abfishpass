@@ -17,27 +17,32 @@
 #----------------------------------------------------------------------------------
 
 #
-# This script creates the database tables that follow the structure
-# in the gdb file.
+# This script runs all the steps to process and calculate connectivity for a watershed.
 #
  
 import appconfig
+from datetime import datetime
 
+startTime = datetime.now()
+
+from processing_scripts import load_parameters
 from processing_scripts import preprocess_watershed
-from processing_scripts import load_and_snap_barriers_cabd 
+from processing_scripts import load_and_snap_barriers_cabd
+from processing_scripts import load_and_snap_fishobservation
+from processing_scripts import load_habitat_access_updates
 from processing_scripts import compute_modelled_crossings
-from processing_scripts import load_assessment_data
+from processing_scripts import load_barrier_updates
 from processing_scripts import compute_mainstems
 from processing_scripts import assign_raw_z
 from processing_scripts import smooth_z
 from processing_scripts import compute_vertex_gradient
 from processing_scripts import compute_segment_gradient
 from processing_scripts import break_streams_at_barriers
-from processing_scripts import load_and_snap_fishobservation
-from processing_scripts import compute_gradient_accessibility
 from processing_scripts import compute_updown_barriers_fish
-from processing_scripts import compute_habitat_models
+from processing_scripts import compute_accessibility
+from processing_scripts import assign_habitat
 from processing_scripts import compute_barriers_upstream_values
+from processing_scripts import compute_barrier_dci
 
 iniSection = appconfig.args.args[0]
 
@@ -45,24 +50,28 @@ workingWatershedId = appconfig.config[iniSection]['watershed_id']
 
 print ("Processing: " + workingWatershedId)
 
-
+load_parameters.main()
 preprocess_watershed.main()
 load_and_snap_barriers_cabd.main()
 load_and_snap_fishobservation.main()
 compute_modelled_crossings.main()
-load_assessment_data.main()
+load_barrier_updates.main()
 compute_mainstems.main()
 assign_raw_z.main()
 smooth_z.main()
 compute_vertex_gradient.main()
 break_streams_at_barriers.main()
+print ("Recalculating elevations on broken streams: " + workingWatershedId)
 #re-assign elevations to broken streams
 assign_raw_z.main()
 smooth_z.main()
 compute_segment_gradient.main()
 compute_updown_barriers_fish.main()
-compute_gradient_accessibility.main()
-compute_habitat_models.main()
+load_habitat_access_updates.main()
+compute_accessibility.main()
+assign_habitat.main()
 compute_barriers_upstream_values.main()
+compute_barrier_dci.main()
 
 print ("Processing Complete: " + workingWatershedId)
+print("Runtime: " + str((datetime.now() - startTime)))
