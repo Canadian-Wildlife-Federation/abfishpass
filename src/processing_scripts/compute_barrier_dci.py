@@ -53,23 +53,6 @@ def getSpeciesConnectivity(conn, species):
 
     return dci_base
 
-# def calculateStreamDCI(stream, fish, totalhabitat, downpassability):
-
-#     streamDCI = {}
-
-#     length = stream.length
-#     habitat = stream.habitat
-
-#     print(habitat)
-
-#     if habitat[fish]:
-#         streamDCI[fish] = ((length / totalhabitat[fish]) * downpassability[fish]) * 100
-#     else:
-#         streamDCI[fish] = 0
-
-#     print(streamDCI)
-#     return streamDCI
-
 def getBarrierDCI(barrier, barrierData, streamData, species, speciesDCI, totalHabitat):
 
     newStreamArray = []
