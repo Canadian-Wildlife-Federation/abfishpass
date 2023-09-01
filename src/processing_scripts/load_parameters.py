@@ -25,107 +25,111 @@ import appconfig
 import subprocess
 import sys
 
-dataFile = appconfig.config['DATABASE']['fish_parameters']
+dataFile = ""
+dataFile = sys.argv[1]
 sourceTable = appconfig.dataSchema + ".fish_species_raw"
 
-def main():
-    with appconfig.connectdb() as conn:
+if len(sys.argv) != 8:
+    print("Invalid usage: py load_parameters.py <dataFile> -c config.ini -user <username> -password <password>")
+    sys.exit()
 
-        query = f"""
-            DROP TABLE IF EXISTS {sourceTable};
+with appconfig.connectdb() as conn:
+
+    query = f"""
+        DROP TABLE IF EXISTS {sourceTable};
+    """
+    with conn.cursor() as cursor:
+        cursor.execute(query)
+    conn.commit()
+
+    # load data using ogr
+    orgDb = "dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost +"' port='"+ appconfig.dbPort + "' user='" + appconfig.dbUser + "' password='" + appconfig.dbPassword + "'"
+    pycmd = '"' + appconfig.ogr + '" -f "PostgreSQL" PG:"' + orgDb + '" "' + dataFile + '"' + ' -nln "' + sourceTable + '" -oo AUTODETECT_TYPE=YES -oo EMPTY_STRING_AS_NULL=YES'
+    print(pycmd)
+    subprocess.run(pycmd)
+    print("CSV loaded to table: " + sourceTable)
+
+    query = f"""
+        DROP TABLE IF EXISTS {appconfig.dataSchema}.{appconfig.fishSpeciesTable};
+
+        CREATE TABLE {appconfig.dataSchema}.{appconfig.fishSpeciesTable}(
+            code varchar(4) PRIMARY KEY,
+            name varchar,
+            allcodes varchar[],
+            
+            accessibility_gradient double precision not null,
+            
+            spawn_gradient_min numeric,
+            spawn_gradient_max numeric,
+            rear_gradient_min numeric,
+            rear_gradient_max numeric,
+            
+            spawn_discharge_min numeric,
+            spawn_discharge_max numeric,
+            rear_discharge_min numeric,
+            rear_discharge_max numeric,
+            
+            spawn_channel_confinement_min numeric,
+            spawn_channel_confinement_max numeric,
+            rear_channel_confinement_min numeric,
+            rear_channel_confinement_max numeric
+            );
         """
-        with conn.cursor() as cursor:
-            cursor.execute(query)
-        conn.commit()
+    with conn.cursor() as cursor:
+        cursor.execute(query)
+    conn.commit()
 
-        # load data using ogr
-        orgDb = "dbname='" + appconfig.dbName + "' host='"+ appconfig.dbHost +"' port='"+ appconfig.dbPort + "' user='" + appconfig.dbUser + "' password='" + appconfig.dbPassword + "'"
-        pycmd = '"' + appconfig.ogr + '" -f "PostgreSQL" PG:"' + orgDb + '" "' + dataFile + '"' + ' -nln "' + sourceTable + '" -oo AUTODETECT_TYPE=YES -oo EMPTY_STRING_AS_NULL=YES'
-        print(pycmd)
-        subprocess.run(pycmd)
-        print("CSV loaded to table: " + sourceTable)
+    query = f"""
+        INSERT INTO {appconfig.dataSchema}.{appconfig.fishSpeciesTable}(
+            code,
+            name,
+            allcodes,
 
-        query = f"""
-            DROP TABLE IF EXISTS {appconfig.dataSchema}.{appconfig.fishSpeciesTable};
+            accessibility_gradient,
 
-            CREATE TABLE {appconfig.dataSchema}.{appconfig.fishSpeciesTable}(
-                code varchar(4) PRIMARY KEY,
-                name varchar,
-                
-                accessibility_gradient double precision not null,
-                
-                spawn_gradient_min numeric,
-                spawn_gradient_max numeric,
-                rear_gradient_min numeric,
-                rear_gradient_max numeric,
-                
-                spawn_discharge_min numeric,
-                spawn_discharge_max numeric,
-                rear_discharge_min numeric,
-                rear_discharge_max numeric,
-                
-                spawn_channel_confinement_min numeric,
-                spawn_channel_confinement_max numeric,
-                rear_channel_confinement_min numeric,
-                rear_channel_confinement_max numeric
-                );
-            """
-        with conn.cursor() as cursor:
-            cursor.execute(query)
-        conn.commit()
+            spawn_gradient_min,
+            spawn_gradient_max,
+            rear_gradient_min,
+            rear_gradient_max,
+            
+            spawn_discharge_min,
+            spawn_discharge_max,
+            rear_discharge_min,
+            rear_discharge_max,
+            
+            spawn_channel_confinement_min,
+            spawn_channel_confinement_max,
+            rear_channel_confinement_min,
+            rear_channel_confinement_max
+        )
+        SELECT
+            code,
+            name,
+            string_to_array(trim(both '"' from allcodes), ','),
 
-        query = f"""
-            INSERT INTO {appconfig.dataSchema}.{appconfig.fishSpeciesTable}(
-                code,
-                name,
+            accessibility_gradient,
 
-                accessibility_gradient,
+            spawn_gradient_min,
+            spawn_gradient_max,
+            rear_gradient_min,
+            rear_gradient_max,
+            
+            spawn_discharge_min,
+            spawn_discharge_max,
+            rear_discharge_min,
+            rear_discharge_max,
+            
+            spawn_channel_confinement_min,
+            spawn_channel_confinement_max,
+            rear_channel_confinement_min,
+            rear_channel_confinement_max
+        FROM {sourceTable};
 
-                spawn_gradient_min,
-                spawn_gradient_max,
-                rear_gradient_min,
-                rear_gradient_max,
-                
-                spawn_discharge_min,
-                spawn_discharge_max,
-                rear_discharge_min,
-                rear_discharge_max,
-                
-                spawn_channel_confinement_min,
-                spawn_channel_confinement_max,
-                rear_channel_confinement_min,
-                rear_channel_confinement_max
-            )
-            SELECT
-                code,
-                name,
+        DROP TABLE {sourceTable};
+        """
 
-                accessibility_gradient,
+    with conn.cursor() as cursor:
+        cursor.execute(query)
+    conn.commit()
 
-                spawn_gradient_min,
-                spawn_gradient_max,
-                rear_gradient_min,
-                rear_gradient_max,
-                
-                spawn_discharge_min,
-                spawn_discharge_max,
-                rear_discharge_min,
-                rear_discharge_max,
-                
-                spawn_channel_confinement_min,
-                spawn_channel_confinement_max,
-                rear_channel_confinement_min,
-                rear_channel_confinement_max
-            FROM {sourceTable};
-
-            DROP TABLE {sourceTable};
-            """
-
-        with conn.cursor() as cursor:
-            cursor.execute(query)
-        conn.commit()
-
-    print (f"""Species parameters loaded to {appconfig.dataSchema}.{appconfig.fishSpeciesTable}""")
-
-if __name__ == "__main__":
-    main()
+print (f"""Species parameters loaded to {appconfig.dataSchema}.{appconfig.fishSpeciesTable}""")

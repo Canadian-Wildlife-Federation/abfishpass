@@ -1,10 +1,11 @@
-# cwf-pei
-Store scripts related to habitat modelling in Prince Edward Island.
+# cwf-alberta
+Store scripts related to habitat modelling in Alberta / CWF
 
 # Overview
 
-This project contains a set of scripts to create and maintain an aquatic connectivity / fish passage database for Prince Edward Island to:
-* Track known barriers to fish passage (e.g., dams, beaver activity, and stream crossings)
+This project contains a set of scripts to create and maintain an aquatic connectivity / fish passage database for Alberta to:
+* Track known barriers to fish passage (e.g., dams, waterfalls, and stream crossings)
+* Work with the Alberta Provincial Watercourse Crossing Program (WCP) and Foothills Stream Crossing Partner (FSCP) crossings and barriers
 * Model potential barriers to fish passage (stream gradient, road/rail stream crossings)
 * Model passability/accessibility of streams based on barriers and species swimming ability
 * Model streams with potential for spawning and rearing activity (for select species)
@@ -12,7 +13,7 @@ This project contains a set of scripts to create and maintain an aquatic connect
 
 # Copyright
 
-Copyright 2023 by Canadian Wildlife Federation
+Copyright 2022 by Canadian Wildlife Federation, Alberta Environment and Parks
 
 # License
 
@@ -38,7 +39,7 @@ All of the scripts allow for a custom configuration file to be specified by prov
 
 > prompt> create_db.py -c custom_config.ini
 
-The config.ini and appconfig.py files are included in the /src and /src/processing_scripts folders by default. If you want to run a script from another folder (e.g., src/load_data), you will need to make sure the config.ini and appconfig.py files are in that folder as well.   
+The config.ini and appconfig.py files are included in the /src and /src/processing_scripts folders by default. If you want to run a script from another folder (e.g., src/load_alberta), you will need to make sure the config.ini and appconfig.py files are in that folder as well.   
 
 We recommend editing a single config.ini file with the configuration parameters you need, then copying this file to the other folders if you want to run individual scripts. 
 
@@ -49,24 +50,31 @@ Data Processing takes part in three steps: load raw data, process each watershed
 
 ## 1 - Loading Raw Data
 
-The first step is to populate the database with the required data. These load scripts are specific to the data provided for PEI. Different source data will require modifications to these scripts.
+The first step is to populate the database with the required data. These load scripts are specific to the data provided for Alberta. Different source data will require modifications to these scripts.
 
 **Scripts**
-* load_data/create_db.py -> this script creates all the necessary database tables
-* load_data/load_data.py -> this script uses OGR to load data for PEI road, trail, and stream networks from a gdb file into the PostgreSQL database.
+* load_alberta/create_db.py -> this script creates all the necessary database tables
+* load_alberta/load_alberta.py -> this script uses OGR to load data for Alberta road, rail, trail, and stream networks from a gdb file into the PostgreSQL database.
 
 **Running the Scripts**  
 * create_db.py -c config.ini -user [username] -password [password]   
-* load_data.py -c config.ini -user [username] -password [password]
+* load_alberta.py -c config.ini -user [username] -password [password]
+
+### 1.1 - Configuring Fish Species Model Parameters
+
+As a part of the loading scripts a fish species table is created which contains the fish species of interest for modelling and various modelling parameters. Before processing the watershed these parameters should be reviewed and configured as necessary.
+
+Note: Currently there is no velocity or channel confinement data. These parameters are placeholders for when this data is added. 
 
 **Main Script**
+
+load_parameters.py [dataFile] -c config.ini -user [username] -password [password]
 
 ## 2 - Watershed Processing
 
 Processing is completed by watershed id. Each watershed is processed into a separate schema in the database. The watershed configuration must be specified in the ini file and the configuration to be used provided to the script (see below).
 
 Currently processing includes:
-* Load fish species parameters - contains the species of interest and various modelling parameters. Before processing the watershed, these parameters should be reviewed and configured as necessary.
 * Preprocessing step which loads all the streams from the raw datastore into the working schema
 * Load barriers from the CABD barrier database
 * Load and snap fish stocking and observation data to stream network
@@ -90,35 +98,30 @@ process_watershed.py -c config.ini [watershedid] -user [username] -password [pas
 
 The watershedid field must be specified as a section header in the config.ini file. The section must describe the watershed processing details for example:
 
-[01cd000]  
-#PEI: 01cd000  
-watershed_id = 01cd000  
-nhn_watershed_id = 01cd000  
-output_schema = ws01cd000  
-fish_observation_data = C:\\temp\\pei_model_testing\\habitat.gpkg  
-assessment_data = C:\\temp\\pei_model_testing\\assessment_data.gpkg  
-beaver_data = C:\\temp\\pei_model_testing\\beaver_activity.gpkg  
-watershed_table = watershed_boundaries  
+[17010301]  
+#Berland: 17010301  
+watershed_id = 17010301  
+nhn_watershed_id = 07AC000  
+output_schema = ws17010301  
+fish_observation_data = C:\temp\BerlandExportFishInventoriesResults.zip  
+assessment_data = C:\temp\berland.gpkg
 
 **Input Requirements**
 
-* Directory of tif images representing DEM files. All files should have the same projection and resolution. The scripts assume this data is in an equal length projection so the st_length2d(geometry) function returns the length in metres. 
-* A raw streams table with id (uuid), name (varchar), strahler order (integer), watershed_id (varchar), and geometry (linestring) fields.
+* Directory of tif images representing DEM files. All files should have the same projection and resolution.
+* A raw streams table with id (uuid), name (varchar), strahler order (integer), watershed_id (varchar), and geometry (linestring) fields. The scripts assume this data is in an equal length projection so the st_length2d(geometry) function returns the length in metres. 
 
 **Output**
 
 * A new schema with a streams table, barrier, modelled crossings and other output tables.  
-
 **ALL EXISTING DATA IN THE OUTPUT TABLES WILL BE DELETED**
 
 
 ## 3 - Compute Summary Statistics
 
-Summary statistics can be computed across multiple watersheds. The watersheds to be processed are specified in config.ini, for example:
+Summary statistic are computed across multiple watersheds. The watersheds to be processed are specified in config.ini, for example:
 
-watershed_data_schemas=ws01cd000,ws02cd000
-
-**Currently, summary statistics can only be calculated for one species of interest at a time**
+watershed_data_schemas=ws17010302,ws17010301
 
 **Main Script**
 
@@ -138,17 +141,6 @@ compute_watershed_stats.py -c config.ini -user [username] -password [password]
 #  Individual Processing Scripts
 
 These scripts are the individual processing scripts that are used for the watershed processing steps.
-
----
-#### 0 - Configuring Fish Species Model Parameters
-
-As a part of the loading scripts a fish species table is created which contains the fish species of interest for modelling and various modelling parameters. Before processing the watershed these parameters should be reviewed and configured as necessary.
-
-Note: Currently there is no velocity or channel confinement data. These parameters are placeholders for when this data is added.  
-
-**Script**  
-
-load_parameters.py [dataFile] -c config.ini -user [username] -password [password]
 
 ---
 #### 1 - Preprocessing
@@ -191,7 +183,7 @@ load_and_snap_barriers_cabd.py -c config.ini [watershedid] -user [username] -pas
 ---
 #### 3 - Load and snap fish observation data
 
-Loads fish observation or habitat data provided and snaps it to the stream network. 
+Loads fish observation data provided and snaps it to the stream network. 
 
 **Script**
 
@@ -199,19 +191,19 @@ load_and_snap_fishobservations.py -c config.ini [watershedid] -user [username] -
 
 **Input Requirements**
 
-* fish observation or habitat data
+* fish observation data
 * stream network
 
 **Output**
 
-* addition of one table: habitat_data
+* addition of three tables: fish_aquatic_habitat, fish_stocking, and fish_survey
 
 
 ---
 #### 4 - Compute Modelled Crossings
-This script computes modelled crossings defined as locations where roads or trails cross stream networks (based on feature geometries). Due to precision and accuracy of the input datasets, not all crossings may not actually exist on the ground.   
+This script computes modelled crossings defined as locations where rail, road, or trails cross stream networks (based on feature geometries). Due to mapping errors, these crossings may not actually exist on the ground.   
 
-The modelled_id field for modelled crossings is a stable id. The second and all subsequent runs of compute_modelled_crossings.py will create an archive table of previous modelled crossings, and assign the modelled_id for newly generated crossings to their previous values, based on a distance threshold of 10 m. If the modelled crossings table is ever dropped (without an archive created) - modelled_ids will be regenerated.
+The modelled_id field for modelled crossings is a stable id. The second and all subsequent runs of compute_modelled_crossings.py will create an archive table of previous modelled crossings, and assign the modelled_id for newly generated crossings to their previous values, based on a distance threshold of 10 m.
 
 
 **Script**
@@ -221,18 +213,19 @@ compute_modelled_crossings.py -c config.ini [watershedid] -user [username] -pass
 **Input Requirements**
 
 * Streams table populated from the preprocessing step
-* Road and trail data loaded from the load_data script
+* Rail, rail, and trail data loaded from the load_alberta data scripts 
 
 **Output**
 
-* A new modelled crossings table with a reference to the stream edge the crossing crosses.
-
+* A new modelled crossings table with a reference to the stream edge the crossing crosses. 
+* Modelled crossings with strahler_order >= 6 are classified as sub_type of bridge and a passability status of PASSABLE
+* Updated barriers table that now includes modelled crossing that occur on streams with strahler order < 6
+ 
 
 ---
 #### 5 - Load Assessment Data
 This script loads assessment data for the watershed, joins it with modelled crossings based on the join_distance parameter in config.ini, loads the joined crossings to a crossings table, then loads these crossings to the barriers table.
 
-For PEI, passability of some modelled crossings and dams are assigned manually during this script.
 
 **Script**
 
@@ -383,6 +376,12 @@ This script computes a number of statistics for each stream segment:
 * number of upstream and downstream barriers
 * the identifiers of the upstream and downstream barriers
 * number of upstream and downstream gradient barriers
+* the fish species stocked (on the stream)
+* the fish species which are stocked upstream and downstream 
+* the fish species surveyed (on the stream)
+* the fish species which were surveyed upstream and downstream
+
+This script also re-matches stream ids to the fish observation data tables to match the ids for broken stream segments.
 
 **Script**
 
@@ -390,6 +389,7 @@ compute_updown_barriers_fish.py -c config.ini [watershedid] -user [username] -pa
 
 **Input Requirements**
 
+* fish observation data
 * stream network
 * barriers table
 
@@ -397,26 +397,29 @@ compute_updown_barriers_fish.py -c config.ini [watershedid] -user [username] -pa
 * addition of statistic fields to stream network table
 
 ---
-#### 15 - Compute accessibility models
+#### 15 - Compute gradient and accessibility models
 
 Computes an accessibility value for each fish species for each stream segment based on:
 * segment gradient
 * maximum accessibility gradient (specified in the fish_species table)
 * barrier location
+* fish survey and stocking information 
 
 Segments are classified as:
 * ACCESSIBLE - when there are no gradient barriers downstream and there are no impassable barriers downstream 
-* POTENTIALLY ACCESSIBLE - when there are no gradient barriers downstream but there are impassable barriers downstream
-* NOT ACCESSIBLE - when there are gradient barriers downstream
+* POTENTIALLY ACCESSIBLE - when there are no gradient barriers downstream OR when there are gradient barriers downstream, but there are fish stocking or fish survey points (for the given species) on the segment or upstream
+* NOT ACCESSIBLE - when there are gradient barriers downstream and no fish stocking or fish survey points (for the given species) on the segment or upstream
 
 Barriers include:
 * CABD loaded barriers (dams) where passability status != 'PASSABLE'
 * Stream crossings where passability status != 'PASSABLE'
-* Beaver activity where passability status != 'PASSABLE'
+
+NOTE: The calculations for potentially accessible and not accessible are currently tailored for resident species. 
+If species of interest are not resident species, users can remove the consideration for fish stocking and fish survey points.
 
 **Script**
 
-compute_accessibility.py -c config.ini [watershedid] -user [username] -password [password]
+compute_gradient_accessibility.py -c config.ini [watershedid] -user [username] -password [password]
 
 **Input Requirements**
 
@@ -430,28 +433,25 @@ compute_accessibility.py -c config.ini [watershedid] -user [username] -password 
 ---
 #### 16 - Compute habitat models
 
-Computes a true/false value for habitat for each species for each stream segment.
+Computes a true/false value for the following habitat models for each species for each stream segment.
 
-Habitat models are currently specific to each species:  
+* Spawning habitat
+* Rearing habitat
+* Habitat (spawning or rearing)
 
-Atlantic salmon  
-* stream segment_gradient <= 0.03 --> true
-* salmon redd observations present on stream segment --> true
-* stream enhancement work has not been completed on the stream --> false  
-* else --> false
+Habitat models are based on all of the following calculations for each species returning true:
 
-American eel  
-* stream strahler order >= 2 --> true
-* else --> false
+* Gradient: stream_gradient ≥ gradient_min AND stream_gradient < gradient_max AND species_accessibility IN (ACCESSIBLE OR POTENTIALLY ACCESSIBLE)
+* Discharge (m3/s): stream_discharge ≥ discharge_min AND stream_discharge < discharge_max AND species_accessibility IN (ACCESSIBLE OR POTENTIALLY ACCESSIBLE)
+* Channel confinement (ratio of valley width / channel width): always true for now - model to be defined later
 
-Smelt/Gaspereau  
-* accessibility of stream segment is 'accessible' or 'potentially accessible' --> true
-* accessibility is defined for this species by the presence of gradient barriers
-* else --> false
+Habitat models are also based on Strahler order - stream segments with a Strahler order of 1 are not considered suitable habitat for any species.
+
+gradient_min, gradient_max, discharge_min, and discharge_max are parameters defined for each fish species in the hydro.fish_species table. These parameters are separated in the fish_species table by spawning and rearing habitat.
 
 **Script**
 
-assign_habitat.py -c config.ini [watershedid] -user [username] -password [password]
+compute_habitat_models.py -c config.ini [watershedid] -user [username] -password [password]
 
 
 **Input Requirements**
@@ -468,10 +468,29 @@ assign_habitat.py -c config.ini [watershedid] -user [username] -password [passwo
 
 Computes a collection of barrier statistics including:
 
+Fish stocking, surveys, and barriers counts:
+* the fish species which were surveyed upstream and downstream
+* the fish species which are stocked upstream and downstream
+* number of upstream and downstream barriers
+* the identifiers of the upstream and downstream barriers
+* number of upstream and downstream gradient barriers
+
 Statistics by species:
 * total potentially accessible upstream distance for each species  
-* total upstream habitat for each species
-* functional upstream habitat for each species
+* total upstream spawning habitat for each species
+* total upstream rearing habitat for each species
+* total upstream habitat (spawning or rearing) for each species
+* functional upstream spawning habitat for each species
+* functional upstream rearing habitat for each species
+* functional upstream habitat (spawning or rearing) for each species
+
+Statistics for all species:
+* total upstream spawning habitat for any species  
+* total upstream rearing habitat for any species
+* total upstream habitat (spawning or rearing) for any species
+* functional upstream spawning habitat for any species
+* functional upstream rearing habitat for any species
+* functional upstream habitat (spawning or rearing) for any species
 
 Functional upstream habitat is calculated by walking up the stream network, summing up length of stream segments with habitat model = true, stopping at the first barrier encountered (upstream).
 
@@ -544,7 +563,7 @@ Notes:
 3. Starting at the source nodes and walking down the network compute a min_elevation value for each node. This value is the minimum of the node's raw elevation values and the upstream node elevation values.
 4. For each node assign a smoothed elevation of the the average of the max_elevation and min_elevation
 5. For each edge in the network
-  * clip all vertices elevations so they are no smaller or bigger than the z values at the end nodes
+  * clip all vertcies elevations so they are no smaller or bigger than the z values at the end nodes
   * compute min/max elevations for each vertex then average the results to get smoothed value 
 
 <pre>
@@ -586,7 +605,7 @@ Mainstems are computed by starting at the sink node and walking up the network. 
 # Configuration File
 
 [OGR]  
-ogr = location of ogr2ogr executable  
+ogr = location of ogr2ogr  executable  
 gdalinfo = location of gdalinfo executable  
 gdalsrsinfo = location of gdalsrsinfo executable   
 proj = *optional* location of proj library  
@@ -598,40 +617,39 @@ name = database name
 
 data_schema = name of main schema for holding raw stream data  
 stream_table = names of streams table  
-fish_parameters = name of fish species table  
-working_srid = the srid of the stream data - these scripts use the function st_length to compute stream length so the raw data should be in a meters based projection (or reprojected before used)  
+fish_species_table = name of fish species table  
+working_srid = the srid (3400) of the stream data - these scripts use the function st_length to compute stream length so the raw data should be in a meters based projection (or reprojected before used)  
 
-[CABD_DATABASE]  
+aquatic_habitat_table = table name for fish aquatic habitat data  
+fish_stocking_table = table name for fish stocking data  
+fish_survey_table = table name for fish survey data  
+  
+[CABD_DATABASE]
 buffer = this is the buffer distance to grab features - the units are in the working_srid so if its meters 200 is reasonable, if it's degrees something like 0.001 is reasonable  
 snap_distance = distance (in working srid units) for snapping point features #to the stream network (fish observation data, barrier data etc)  
   
 [CREATE_LOAD_SCRIPT]  
-raw_data = spatial file containing raw road, trail, and stream data  
+raw_data = raw alberta data  
 road_table = road table name  
+rail_table = rail table name  
 trail_table = trail table name  
-watershed_data = spatial file containing watershed boundaries. this can be the same as the raw_data file  
-watershed_table = name of the layer containing watershed boundaries
   
 [PROCESSING]  
 stream_table = stream table name 
 
 [WATERSHEDID 1] -> there will be one section for each watershed with a unique section name  
-watershed_id = watershed id to process  
-nhn_watershed_id = nhn watershed id to process  
+watershed_id = watershed id to process
+nhn_watershed_id = nhn watershed id to process
 output_schema = output schema name  
 fish_observation_data = zip file containing fish observation data  
-assessment_data = spatial file containing assessment data  
-beaver_data = spatial file containing beaver activity data  
-watershed_table = table containing watershed boundaries
+assessment_data = spatial file containing assessment data
 
 [WATERSHEDID 2] -> there will be one section for each watershed with a unique section name  
-watershed_id = watershed id to process  
-nhn_watershed_id = nhn watershed id to process  
+watershed_id = watershed id to process
+nhn_watershed_id = nhn watershed id to process
 output_schema = output schema name  
-fish_observation_data = zip file containing fish observation data  
-assessment_data = spatial file containing assessment data  
-beaver_data = spatial file containing beaver activity data  
-watershed_table = table containing watershed boundaries
+fish_observation_data = zip file containing fish observation data
+assessment_data = spatial file containing assessment data
   
 [ELEVATION_PROCESSING]  
 dem_directory = directory containing dem   
@@ -659,8 +677,9 @@ crossings_table = table for storing all stream crossings (both modelled and asse
 
 join_distance = distance (in working srid units) for joining assessment data with modelled crossings
 
+strahler_order_barrier_limit = all crossings on streams with Strahler order less than this will be considered barriers and treated similar to dams/waterfalls for habitat modelling  
 
-[HABITAT_STATS]  
+[HABITAT_STATS]
 stats_table = this table will be created in the [DATABASE].data_schema schema and contain watershed statistics
 
 watershed_data_schemas = the list of processing schemas to include in the stats table; the schemas must exist and data must be fully processed

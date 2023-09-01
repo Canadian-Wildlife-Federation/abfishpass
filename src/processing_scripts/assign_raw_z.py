@@ -37,7 +37,7 @@ dbTargetSchema = appconfig.config[iniSection]['output_schema']
 dbTargetTable = appconfig.config['PROCESSING']['stream_table']
 
 dbTargetGeom = appconfig.config['ELEVATION_PROCESSING']['3dgeometry_field']
-demDir = appconfig.config['ELEVATION_PROCESSING']['dem_directory']
+demDir = appconfig.config['ELEVATION_PROCESSING']['dem_directory'];
 
 demfiles = []
 
@@ -137,7 +137,7 @@ def getFileDetails(demfile):
     xsize = (xmax - xmin) / xcnt
     ysize = (ymax - ymin) / ycnt 
     
-    nodata = metadata['bands'][0]['noDataValue']
+    nodata = metadata['bands'][0]['noDataValue'];
 
     return DEMFile(demfile, xmin, ymin, xmax,ymax, xsize, ysize, xcnt, ycnt, srid, nodata)    
 
@@ -153,7 +153,7 @@ def processArea(demfile, connection, onlymissing = False):
         f_table_name = '{dbTargetTable}' and 
         f_geometry_column = '{appconfig.dbGeomField}'
     """
-    srid = -9999
+    srid = -9999;
     
     with connection.cursor() as cursor:
         cursor.execute(query)
@@ -237,11 +237,11 @@ def processArea(demfile, connection, onlymissing = False):
     
 def processGeometry(geom, demfile, demdata, onlymissing):
     
-    newpnts = []
+    newpnts = [];
     for c in geom.coords:
         x = c[0]
         y = c[1]
-        z = c[2]
+        z = c[2];
         newpnts.append(processCoordinate(x, y, z, demfile, demdata, onlymissing))
             
     #make a geometry from newpnts
@@ -276,7 +276,7 @@ def processCoordinate(x, y, z, demfile, demdata, onlymissing):
         #be processed by another area
         if (xindex < 0 or xindex >= demfile.xcnt or yindex < 0 or yindex >= demfile.ycnt  or
             xindex2 < 0 or xindex2 >= demfile.xcnt or yindex2 < 0 or yindex2 >= demfile.ycnt ): 
-            return [x, y, z]
+            return [x, y, z];
    
     
     x1 = xindex * demfile.xcellsize + demfile.xmin + 0.5 * demfile.xcellsize
@@ -343,7 +343,7 @@ def main():
     
     with appconfig.connectdb() as conn:
         
-        prepareOutput(conn)
+        prepareOutput(conn);
     
         demfiles = indexDem()
         
