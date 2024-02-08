@@ -34,12 +34,13 @@ orderBarrierLimit = appconfig.config['CROSSINGS']['strahler_order_barrier_limit'
 roadTable = appconfig.config['CREATE_LOAD_SCRIPT']['road_table']
 railTable = appconfig.config['CREATE_LOAD_SCRIPT']['rail_table']
 trailTable = appconfig.config['CREATE_LOAD_SCRIPT']['trail_table']
-    
-dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
 
-    
+dbBarrierTable = appconfig.config['BARRIER_PROCESSING']['barrier_table']
+dbCrossingsTable = appconfig.config['CROSSINGS']['crossings_table']
+
+
 def createTable(connection):
-    
+
     query = f"""
         --create an archive table so we can keep modelled_id stable
         DROP TABLE IF EXISTS {dbTargetSchema}.{dbModelledCrossingsTable}_archive;
@@ -71,6 +72,7 @@ def createTable(connection):
     
     with connection.cursor() as cursor:
         cursor.execute(query)
+    connection.commit()
 
 def computeCrossings(connection):
         
@@ -145,7 +147,7 @@ def computeCrossings(connection):
         DELETE FROM {dbTargetSchema}.{dbModelledCrossingsTable} p1
         WHERE EXISTS (SELECT FROM {dbTargetSchema}.{dbModelledCrossingsTable} p2
             WHERE p1.modelled_id > p2.modelled_id
-            AND ST_DWithin(p1.geometry,p2.geometry,0.01));
+            AND ST_DWithin(p1.geometry,p2.geometry,1));
 
     """
     #print(query)
@@ -155,6 +157,8 @@ def computeCrossings(connection):
 def matchArchive(connection):
 
     query = f"""
+        ALTER TABLE {dbTargetSchema}.{dbModelledCrossingsTable} DROP CONSTRAINT IF EXISTS modelled_crossings_pkey;
+
         WITH matched AS (
             SELECT
             a.modelled_id,
@@ -176,7 +180,9 @@ def matchArchive(connection):
             FROM matched m
             WHERE m.modelled_id = a.modelled_id;
 
-        --DROP TABLE {dbTargetSchema}.{dbModelledCrossingsTable}_archive;
+        ALTER TABLE {dbTargetSchema}.{dbModelledCrossingsTable} ADD PRIMARY KEY (modelled_id);
+
+        DROP TABLE {dbTargetSchema}.{dbModelledCrossingsTable}_archive;
 
     """
     with connection.cursor() as cursor:
@@ -208,15 +214,15 @@ def computeAttributes(connection):
     with connection.cursor() as cursor:
         cursor.execute(query)
 
-def main():                        
-    #--- main program ---    
+def main():   
+    #--- main program ---
     with appconfig.connectdb() as conn:
-        
+
         conn.autocommit = False
-        
+
         print("Computing Modelled Crossings")
-        
-        print("  creating tables")
+
+        print("  creating tales")
         createTable(conn)
         
         print("  computing modelled crossings")
@@ -227,10 +233,10 @@ def main():
 
         print("  calculating modelled crossing attributes")
         computeAttributes(conn)
-        
+
         conn.commit()
-                
+
     print("done")
 
 if __name__ == "__main__":
-    main() 
+    main()
