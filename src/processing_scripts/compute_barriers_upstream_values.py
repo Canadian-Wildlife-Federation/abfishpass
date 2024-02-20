@@ -634,13 +634,24 @@ def writeResults(connection):
         DROP TABLE {dbTargetSchema}.temp;
     """
     with connection.cursor() as cursor:
-        cursor.execute(query)        
+        cursor.execute(query)
+
+    query = "SELECT current_user;"
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        user = cursor.fetchone()
+        user = user[0]
+
+    query = f"""
+        REASSIGN OWNED BY {user} TO cwf_analyst;
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query)
 
     connection.commit()
 
-
 def assignBarrierSpeciesCounts(connection):
-    
+
     query = f"""
         UPDATE {dbTargetSchema}.{dbBarrierTable}
         SET species_upstr = a.fish_survey_up,
@@ -662,11 +673,10 @@ def assignBarrierSpeciesCounts(connection):
         
     """
     with connection.cursor() as cursor:
-        cursor.execute(query)             
+        cursor.execute(query)
 
     connection.commit()
-    
-    
+
 #--- main program ---
 def main():
 

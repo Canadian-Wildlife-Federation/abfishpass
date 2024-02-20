@@ -45,7 +45,7 @@ dbHuc8Table = appconfig.config['CREATE_LOAD_SCRIPT']['huc8_table']
 joinDistance = appconfig.config['CROSSINGS']['join_distance']
 
 def loadAssessmentData(connection):
-        
+
     # create assessed crossings table
     query = f"""
         DROP TABLE IF EXISTS {dataSchema}.{dbTempTable};
@@ -267,23 +267,23 @@ def loadToBarriers(connection):
 
 #--- main program ---
 def main():
-        
+
     with appconfig.connectdb() as conn:
-        
+
         conn.autocommit = False
-        
+
         print("Loading Assessment Data for Stream Crossings")
-        
+
         print("  loading assessment data")
         loadAssessmentData(conn)
-        
+
         print("  joining assessment points to modelled points")
         joinAssessmentData(conn)
-        
+
         print("  adding joined points to crossings and barriers tables")
-        loadToBarriers(conn)  
-        
+        loadToBarriers(conn)
+
     print("done")
-    
+
 if __name__ == "__main__":
-    main()   
+    main()
