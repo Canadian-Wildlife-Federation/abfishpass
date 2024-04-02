@@ -18,10 +18,11 @@
 
 import configparser
 import os
+import enum
+import argparse
+import getpass
 import psycopg2 as pg2
 import psycopg2.extras
-import enum 
-import argparse
 
 NODATA = -999999
 
@@ -34,24 +35,23 @@ parser.add_argument('-user', type=str, help='the username to access the database
 parser.add_argument('-password', type=str, help='the password to access the database')
 parser.add_argument('args', type=str, nargs='*')
 args = parser.parse_args()
-if (args.c):
-    configfile = args.c
 
-   
+if args.c:
+    configfile = args.c
 
 config = configparser.ConfigParser()
 config.read(configfile)
 
 ogr = config['OGR']['ogr']
-proj = config['OGR']['proj']; 
+proj = config['OGR']['proj']
 gdalinfo = config['OGR']['gdalinfo']
 gdalsrsinfo = config['OGR']['gdalsrsinfo']
 
 dbHost = config['DATABASE']['host']
 dbPort = config['DATABASE']['port']
 dbName = config['DATABASE']['name']
-dbUser = args.user
-dbPassword = args.password
+dbUser = input(f"""Enter username to access {dbName}:\n""")
+dbPassword = getpass.getpass(f"""Enter password to access {dbName}:\n""")
 
 dataSchema = config['DATABASE']['data_schema']
 streamTable = config['DATABASE']['stream_table']
@@ -59,7 +59,7 @@ streamTableDischargeField = "discharge"
 streamTableChannelConfinementField = "channel_confinement"
 fishSpeciesTable = config['DATABASE']['fish_species_table']
 
-dataSrid = config['DATABASE']['working_srid']  
+dataSrid = config['DATABASE']['working_srid']
 
 dbIdField = "id"
 dbGeomField = "geometry"
@@ -70,19 +70,18 @@ class Accessibility(enum.Enum):
     POTENTIAL = 'POTENTIALLY ACCESSIBLE'
     NOT = 'NOT ACCESSIBLE'
 
-
 print(f"""--- Configuration Settings Begin ---
 Database: {dbHost}:{dbPort}:{dbName}:{dbUser}
 OGR: {ogr}
 SRID: {dataSrid}
 Raw Data Schema: {dataSchema}
 --- Configuration Settings End ---
-""")   
+""")
 
 #if you have multiple version of proj installed
 #you might need to set this to match gdal one
 #not always required
-if (proj != ""):
+if proj != "":
     os.environ["PROJ_LIB"] = proj
 
 psycopg2.extras.register_uuid()

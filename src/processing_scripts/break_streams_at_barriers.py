@@ -155,7 +155,7 @@ def breakstreams (conn):
             FROM 
                 {dbTargetSchema}.{dbTargetStreamTable} a,  
                 {dbTargetSchema}.break_points b 
-            WHERE st_distance(st_force2d(a.geometry_smoothed3d), b.point) < 0.000000001 
+            WHERE ST_DWithin(st_force2d(a.geometry_smoothed3d), b.point, 0.000000001)  
             GROUP BY a.{appconfig.dbIdField}
         ),
         newlines as (
